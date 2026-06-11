@@ -1,0 +1,91 @@
+{% extends 'LittlelemonAPI/base.html' %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
+  <div>
+    <p class="text-uppercase small text-primary fw-semibold mb-1">Orders</p>
+    <h2 class="h3 fw-bold mb-0">Recent orders</h2>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'categories' %}">Back to dashboard</a>
+</div>
+
+{% if is_manager %}
+<div class="alert alert-warning rounded-4 shadow-sm mb-4">Manager view: review the full order stream and update delivery status from this page.</div>
+{% else %}
+<div class="alert alert-info rounded-4 shadow-sm mb-4">Customer view: track the orders you can view as part of your account.</div>
+{% endif %}
+
+<div class="row g-4">
+  {% for order in page_obj %}
+  <div class="col-12 col-md-6 col-xl-4">
+    <article class="card shadow-sm border-0 rounded-4 h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge text-bg-light text-dark">Order #{{ order.id }}</span>
+          <span class="badge {% if order.status %}text-bg-success{% else %}text-bg-warning{% endif %}">{% if order.status %}Completed{% else %}Pending{% endif %}</span>
+        </div>
+        <h3 class="h5 fw-semibold mb-1">{{ order.user.username }}</h3>
+        <p class="text-muted small mb-3">{{ order.date }}</p>
+        <ul class="list-unstyled small text-muted mb-0">
+          <li><strong>Total:</strong> ${{ order.total }}</li>
+          <li><strong>Delivery crew:</strong> {{ order.delivery_crew.username|default:'Unassigned' }}</li>
+          <li><strong>Status:</strong> {% if order.status %}Completed{% else %}Pending{% endif %}</li>
+        </ul>
+        {% if is_manager %}
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-outline-warning btn-sm" type="button" onclick="toggleOrderStatus({{ order.id }}, {{ order.status|yesno:'true,false' }})">{% if order.status %}Mark pending{% else %}Mark completed{% endif %}</button>
+        </div>
+        {% endif %}
+      </div>
+    </article>
+  </div>
+  {% empty %}
+  <div class="col-12"><div class="alert alert-info mb-0">No orders are available yet.</div></div>
+  {% endfor %}
+</div>
+
+{% if is_manager %}
+<script>
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return '';
+}
+
+function api(path, options) {
+  const token = localStorage.getItem('littlelemon_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': getCookie('csrftoken'),
+    'Accept': 'application/json'
+  };
+  if (token) {
+    headers.Authorization = `Token ${token}`;
+  }
+
+  return fetch(path, {
+    headers,
+    ...options
+  }).then(r => r.json().catch(() => ({})));
+}
+
+function toggleOrderStatus(id, currentStatus) {
+  api('/api/orders/' + id, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: !currentStatus })
+  }).then(() => location.reload());
+}
+</script>
+{% endif %}
+
+{% if page_obj.has_other_pages %}
+<nav class="mt-4" aria-label="Orders pagination">
+  <ul class="pagination justify-content-center flex-wrap">
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>{% endif %}
+    {% for num in page_obj.paginator.page_range %}<li class="page-item {% if page_obj.number == num %}active{% endif %}"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>{% endfor %}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>{% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

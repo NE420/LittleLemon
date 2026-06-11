@@ -1,0 +1,136 @@
+{% extends 'LittlelemonAPI/base.html' %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
+  <div>
+    <p class="text-uppercase small text-primary fw-semibold mb-1">Categories</p>
+    <h2 class="h3 fw-bold mb-0">Store categories</h2>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'categories' %}">Back to dashboard</a>
+</div>
+
+{% if is_manager %}
+<div class="alert alert-warning rounded-4 shadow-sm mb-4">Manager mode: create, edit, and remove categories from this page.</div>
+{% else %}
+<div class="alert alert-info rounded-4 shadow-sm mb-4">Customer mode: browse the catalog and continue to the menu.</div>
+{% endif %}
+
+{% if is_manager %}
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-body">
+    <h3 class="h5 fw-semibold mb-3">Manager controls</h3>
+    <form id="create-category-form" class="row g-3 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label small text-uppercase text-muted">Title</label>
+        <input id="create-title" class="form-control" required />
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label small text-uppercase text-muted">Slug</label>
+        <input id="create-slug" class="form-control" required />
+      </div>
+      <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-success w-100">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+  {% for category in categories %}
+  <div class="col-12 col-md-6 col-xl-4">
+    <article class="card shadow-sm border-0 rounded-4 h-100">
+      <div class="card-body">
+        <span class="badge text-bg-light text-dark">{{ category.slug }}</span>
+        <h3 class="h5 fw-semibold mt-3 mb-2">{{ category.title }}</h3>
+        <p class="text-muted mb-0">A tidy category card for the LittleLemon storefront.</p>
+        {% if is_manager %}
+        <div class="dropdown mt-3">
+          <button class="btn btn-outline-warning btn-sm dropdown-toggle" type="button" id="categoryDropdown{{ category.id }}" data-bs-toggle="dropdown" aria-expanded="false">
+            Edit
+          </button>
+          <div class="dropdown-menu p-3 shadow-sm" aria-labelledby="categoryDropdown{{ category.id }}">
+            <form onsubmit="updateCategory(event, {{ category.id }})" class="row g-3">
+              <div class="col-12">
+                <label class="form-label small text-uppercase text-muted">Title</label>
+                <input id="update-title-{{ category.id }}" class="form-control form-control-sm" value="{{ category.title|escapejs }}" required />
+              </div>
+              <div class="col-12">
+                <label class="form-label small text-uppercase text-muted">Slug</label>
+                <input id="update-slug-{{ category.id }}" class="form-control form-control-sm" value="{{ category.slug|escapejs }}" required />
+              </div>
+              <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary btn-sm w-100" type="submit">Save</button>
+                <button class="btn btn-outline-danger btn-sm w-100" type="button" onclick="deleteCategory({{ category.id }})">Delete</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </article>
+  </div>
+  {% empty %}
+  <div class="col-12">
+    <div class="alert alert-info mb-0">No categories are available yet.</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if is_manager %}
+<script>
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return '';
+}
+
+function api(path, options) {
+  const token = localStorage.getItem('littlelemon_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': getCookie('csrftoken'),
+    'Accept': 'application/json'
+  };
+  if (token) {
+    headers.Authorization = `Token ${token}`;
+  }
+
+  return fetch(path, {
+    headers,
+    ...options
+  }).then(r => r.json().catch(() => ({})));
+}
+
+function deleteCategory(id) {
+  if (!confirm('Delete this category?')) return;
+  api('/api/categories/' + id, { method: 'DELETE' }).then(() => location.reload());
+}
+
+function updateCategory(event, id) {
+  event.preventDefault();
+  const title = document.getElementById(`update-title-${id}`).value;
+  const slug = document.getElementById(`update-slug-${id}`).value;
+  api('/api/categories/' + id, {
+    method: 'PUT',
+    body: JSON.stringify({ title, slug })
+  }).then(() => location.reload());
+}
+
+const createForm = document.getElementById('create-category-form');
+if (createForm) {
+  createForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    api('/api/categories', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: document.getElementById('create-title').value,
+        slug: document.getElementById('create-slug').value
+      })
+    }).then(() => location.reload());
+  });
+}
+</script>
+{% endif %}
+{% endblock %}

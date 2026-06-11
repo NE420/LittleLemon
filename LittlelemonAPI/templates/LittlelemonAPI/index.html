@@ -1,0 +1,45 @@
+{% extends 'LittlelemonAPI/base.html' %}
+
+{% block content %}
+<div class="row g-4 align-items-stretch">
+  <div class="col-12 col-xl-7">
+    <div class="card shadow-sm border-0 rounded-4 h-100">
+      <div class="card-body p-4">
+        <p class="text-uppercase small text-primary fw-semibold mb-2">Overview</p>
+        <h1 class="display-6 fw-bold mb-3">A clean, responsive dashboard for LittleLemon.</h1>
+        <p class="text-muted mb-4">Browse categories, filter menu items, review carts and orders, and inspect manager and delivery-crew groups from one responsive interface.</p>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-primary" href="{% url 'menu_items' %}">Explore menu</a>
+          <a class="btn btn-outline-secondary" href="{% url 'orders' %}">View orders</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-5">
+    <div class="row g-4">
+      {% for label, value in stats.items %}
+      <div class="col-6">
+        <div class="card shadow-sm border-0 rounded-4 h-100">
+          <div class="card-body">
+            <p class="text-uppercase small text-muted mb-1">{{ label|title }}</p>
+            <h3 class="fw-bold mb-0">{{ value }}</h3>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card shadow-sm border-0 rounded-4 h-100"><div class="card-body"><h5 class="card-title">Categories</h5><p class="text-muted">Review all menu categories and manage the storefront structure.</p><a href="{% url 'categories' %}" class="btn btn-outline-dark btn-sm">Open</a></div></div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card shadow-sm border-0 rounded-4 h-100"><div class="card-body"><h5 class="card-title">Menu items</h5><p class="text-muted">Use the built-in search, category filter, and pages to browse items quickly.</p><a href="{% url 'menu_items' %}" class="btn btn-outline-dark btn-sm">Open</a></div></div>
+  </div>
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card shadow-sm border-0 rounded-4 h-100"><div class="card-body"><h5 class="card-title">Orders</h5><p class="text-muted">Track order activity and keep the delivery flow organized.</p><a href="{% url 'orders' %}" class="btn btn-outline-dark btn-sm">Open</a></div></div>
+  </div>
+</div>
+{% endblock %}

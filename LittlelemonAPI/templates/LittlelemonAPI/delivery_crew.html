@@ -1,0 +1,26 @@
+{% extends 'LittlelemonAPI/base.html' %}
+
+{% block content %}
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
+  <div>
+    <p class="text-uppercase small text-primary fw-semibold mb-1">Delivery crew</p>
+    <h2 class="h3 fw-bold mb-0">Delivery crew members</h2>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'categories' %}">Back to dashboard</a>
+</div>
+
+<div class="row g-4">
+  {% for member in crew %}
+  <div class="col-12 col-md-6 col-xl-4">
+    <article class="card shadow-sm border-0 rounded-4 h-100">
+      <div class="card-body">
+        <h3 class="h5 fw-semibold mb-1">{{ member.username }}</h3>
+        <p class="text-muted small mb-0">{{ member.email|default:'No email on file' }}</p>
+      </div>
+    </article>
+  </div>
+  {% empty %}
+  <div class="col-12"><div class="alert alert-info mb-0">No delivery crew members are assigned yet.</div></div>
+  {% endfor %}
+</div>
+{% endblock %}
