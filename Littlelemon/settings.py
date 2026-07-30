@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'djoser',
     'django_filters',
     'LittlelemonAPI.apps.LittlelemonapiConfig',
+    'frontend.apps.FrontendConfig',
 ]
 
 MIDDLEWARE = [

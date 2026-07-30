@@ -5,8 +5,7 @@ from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer,
 from rest_framework.response import Response
 
 from rest_framework.permissions import IsAdminUser
-from django.shortcuts import get_object_or_404, render
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.shortcuts import get_object_or_404
 
 from django.contrib.auth.models import Group, User
 
@@ -22,15 +21,6 @@ class CategoriesView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
-    def get(self, request, *args, **kwargs):
-        if 'text/html' in request.headers.get('Accept', ''):
-            queryset = self.filter_queryset(self.get_queryset())
-            return render(request, 'LittlelemonAPI/categories.html', {
-                'categories': queryset,
-                'is_manager': is_manager(request.user),
-            })
-        return super().get(request, *args, **kwargs)
-
     def get_permissions(self):
         permission_classes = []
         if self.request.method != 'GET':
@@ -43,34 +33,6 @@ class MenuItemsView(generics.ListCreateAPIView):
     serializer_class = MenuItemSerializer
     search_fields = ['category__title']
     ordering_fields = ['price', 'inventory']
-
-    def get(self, request, *args, **kwargs):
-        if 'text/html' in request.headers.get('Accept', ''):
-            queryset = self.filter_queryset(self.get_queryset())
-            search_query = request.GET.get('q', '').strip()
-            category_id = request.GET.get('category', '')
-            if search_query:
-                queryset = queryset.filter(title__icontains=search_query)
-            if category_id:
-                queryset = queryset.filter(category_id=category_id)
-
-            paginator = Paginator(queryset.order_by('title'), 6)
-            page_number = request.GET.get('page', 1)
-            try:
-                page_obj = paginator.page(page_number)
-            except PageNotAnInteger:
-                page_obj = paginator.page(1)
-            except EmptyPage:
-                page_obj = paginator.page(paginator.num_pages)
-
-            return render(request, 'LittlelemonAPI/menu_items.html', {
-                'page_obj': page_obj,
-                'categories': Category.objects.all().order_by('title'),
-                'search_query': search_query,
-                'selected_category': category_id,
-                'is_manager': is_manager(request.user),
-            })
-        return super().get(request, *args, **kwargs)
 
     def get_permissions(self):
         permission_classes = []
@@ -111,17 +73,6 @@ class CartView(generics.ListCreateAPIView):
     def get_queryset(self):
         return Cart.objects.all().filter(user=self.request.user)
 
-    def get(self, request, *args, **kwargs):
-        if 'text/html' in request.headers.get('Accept', ''):
-            cart_items = self.get_queryset().select_related('menuitem', 'menuitem__category', 'user').order_by('-id')
-            total = sum(item.price for item in cart_items)
-            return render(request, 'LittlelemonAPI/cart.html', {
-                'cart_items': cart_items,
-                'total': total,
-                'is_manager': is_manager(request.user),
-            })
-        return super().get(request, *args, **kwargs)
-
     def delete(self, request, *args, **kwargs):
         Cart.objects.all().filter(user=self.request.user).delete()
         return Response("ok")
@@ -133,8 +84,6 @@ class OrderView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if self.request.method == 'GET' and 'text/html' in self.request.headers.get('Accept', ''):
-            return [AllowAny()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
@@ -153,23 +102,6 @@ class OrderView(generics.ListCreateAPIView):
         return Order.objects.all()
         # else:
         #     return Order.objects.all()
-
-    def get(self, request, *args, **kwargs):
-        if 'text/html' in request.headers.get('Accept', ''):
-            orders = self.get_queryset().select_related('user', 'delivery_crew').order_by('-date', '-id')
-            paginator = Paginator(orders, 6)
-            page_number = request.GET.get('page', 1)
-            try:
-                page_obj = paginator.page(page_number)
-            except PageNotAnInteger:
-                page_obj = paginator.page(1)
-            except EmptyPage:
-                page_obj = paginator.page(paginator.num_pages)
-            return render(request, 'LittlelemonAPI/orders.html', {
-                'page_obj': page_obj,
-                'is_manager': is_manager(request.user),
-            })
-        return super().get(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         menuitem_count = Cart.objects.all().filter(user=self.request.user).count()
@@ -226,14 +158,10 @@ class GroupViewSet(viewsets.ViewSet):
     permission_classes = [IsAdminUser]
 
     def get_permissions(self):
-        if 'text/html' in self.request.headers.get('Accept', ''):
-            return [AllowAny()]
         return [IsAdminUser()]
 
     def list(self, request):
         users = User.objects.all().filter(groups__name='Manager').distinct().order_by('username')
-        if 'text/html' in request.headers.get('Accept', ''):
-            return render(request, 'LittlelemonAPI/managers.html', {'managers': users})
         items = UserSerilializer(users, many=True)
         return Response(items.data)
 
@@ -253,14 +181,10 @@ class DeliveryCrewViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        if 'text/html' in self.request.headers.get('Accept', ''):
-            return [AllowAny()]
         return [IsAuthenticated()]
 
     def list(self, request):
         users = User.objects.all().filter(groups__name='Delivery crew').distinct().order_by('username')
-        if 'text/html' in request.headers.get('Accept', ''):
-            return render(request, 'LittlelemonAPI/delivery_crew.html', {'crew': users})
         items = UserSerilializer(users, many=True)
         return Response(items.data)
 
