@@ -57,7 +57,11 @@ def menu_items_view(request):
 
 
 def cart_view(request):
-    cart_items = Cart.objects.all().filter(user=request.user).select_related('menuitem', 'menuitem__category', 'user').order_by('-id')
+    if request.user.is_authenticated:
+        cart_items = Cart.objects.all().filter(user=request.user).select_related('menuitem', 'menuitem__category', 'user').order_by('-id')
+    else:
+        cart_items = Cart.objects.none()
+
     total = sum(item.price for item in cart_items)
     return render(request, 'frontend/cart.html', {
         'cart_items': cart_items,
