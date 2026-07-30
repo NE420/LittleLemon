@@ -1,3 +1,4 @@
+import requests
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.contrib.auth.models import Group, User
 from django.shortcuts import get_object_or_404, render
@@ -19,6 +20,29 @@ def index_view(request):
         'orders': Order.objects.count(),
     }
     return render(request, 'frontend/index.html', {'stats': stats, 'is_manager': is_manager(request.user)})
+
+
+def login_view(request):
+    error = None
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '').strip()
+        if username and password:
+            response = requests.post(
+                'http://127.0.0.1:8000/token/login',
+                json={'username': username, 'password': password},
+                timeout=5,
+            )
+            if response.status_code == 200:
+                token = response.json().get('token')
+                if token:
+                    request.session['auth_token'] = token
+                    return render(request, 'frontend/login.html', {'success': True, 'token': token})
+            error = 'Invalid username or password.'
+        else:
+            error = 'Please enter both username and password.'
+
+    return render(request, 'frontend/login.html', {'error': error})
 
 
 def categories_view(request):

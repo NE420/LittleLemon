@@ -1,0 +1,39 @@
+{% extends 'frontend/base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-5">
+    <div class="card shadow-sm border-0 rounded-4">
+      <div class="card-body p-4">
+        <p class="text-uppercase small text-primary fw-semibold mb-2">Authentication</p>
+        <h2 class="h3 fw-bold mb-3">Sign in to LittleLemon</h2>
+        <p class="text-muted mb-4">Use your Djoser credentials to receive a token and access the protected pages.</p>
+
+        {% if success %}
+        <div class="alert alert-success rounded-4">
+          <strong>Login successful.</strong> Your token has been received.
+        </div>
+        <div class="small text-muted">Token: <code>{{ token }}</code></div>
+        {% else %}
+        {% if error %}
+        <div class="alert alert-danger rounded-4">{{ error }}</div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label" for="username">Username</label>
+            <input id="username" name="username" class="form-control" required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="password">Password</label>
+            <input id="password" name="password" type="password" class="form-control" required />
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Log in</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
