@@ -2,19 +2,14 @@ import requests
  
 BASE_URL = "http://127.0.0.1:8000/api"
  
-# Djoser's own urls (path('auth/', include('djoser.urls')) etc.) use
-# trailing slashes. Note: your main urls.py also has a bare
-# path('token/login', views.obtain_auth_token) — don't use that one
-# here, since it's DRF's stock view and returns {'token': ...} instead
-# of Djoser's {'auth_token': ...}.
 AUTH_BASE_URL = "http://127.0.0.1:8000/auth"
 LOGIN_ENDPOINT = f"{AUTH_BASE_URL}/token/login/"
 LOGOUT_ENDPOINT = f"{AUTH_BASE_URL}/token/logout/"
 CURRENT_USER_ENDPOINT = f"{AUTH_BASE_URL}/users/me/"
  
  
-class APIError(Exception):
-    """Raised when the backend returns a non-2xx response."""
+class APIError(Exception): #Raised when the backend returns a non-2xx response.
+    
     def __init__(self, status_code, detail):
         self.status_code = status_code
         self.detail = detail
@@ -42,8 +37,8 @@ def _handle(response):
  
 # ---------- Auth ----------
  
-def login(username, password):
-    """Returns Djoser's payload: {'auth_token': '...'}"""
+def login(username, password): #Returns Djoser's payload: {'auth_token': '...'}
+    
     resp = requests.post(
         LOGIN_ENDPOINT,
         data={"username": username, "password": password},
@@ -51,21 +46,14 @@ def login(username, password):
     return _handle(resp)
  
  
-def logout(token):
-    """Invalidates the token server-side (Djoser deletes it)."""
+def logout(token): #Invalidates the token server-side (Djoser deletes it).
+    
     resp = requests.post(LOGOUT_ENDPOINT, headers=_headers(token))
     return _handle(resp)
  
  
 def get_current_user(token):
-    """
-    Djoser's default UserSerializer only returns id/username/email —
-    no groups. If you need role info here (Manager / Delivery crew /
-    Customer) on the frontend, either:
-      a) customize DJOSER['SERIALIZERS']['current_user'] on the backend
-         to include groups, or
-      b) keep using the try/except-403 approach in views.py.
-    """
+
     resp = requests.get(CURRENT_USER_ENDPOINT, headers=_headers(token))
     return _handle(resp)
  

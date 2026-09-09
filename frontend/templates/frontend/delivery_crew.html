@@ -9,13 +9,36 @@
   <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:index' %}">Back to dashboard</a>
 </div>
 
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-body">
+    <h3 class="h5 fw-semibold mb-3">Add a delivery crew member</h3>
+    <form method="post" class="row g-3 align-items-end">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add" />
+      <div class="col-12 col-md-8">
+        <label class="form-label small text-uppercase text-muted">Username</label>
+        <input name="username" class="form-control" required />
+      </div>
+      <div class="col-12 col-md-4">
+        <button type="submit" class="btn btn-success w-100">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="row g-4">
   {% for member in crew %}
   <div class="col-12 col-md-6 col-xl-4">
     <article class="card shadow-sm border-0 rounded-4 h-100">
       <div class="card-body">
         <h3 class="h5 fw-semibold mb-1">{{ member.username }}</h3>
-        <p class="text-muted small mb-0">{{ member.email|default:'No email on file' }}</p>
+        <p class="text-muted small mb-3">{{ member.email|default:'No email on file' }}</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="remove" />
+          <input type="hidden" name="username" value="{{ member.username }}" />
+          <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remove {{ member.username|escapejs }} from the delivery crew?');">Remove</button>
+        </form>
       </div>
     </article>
   </div>

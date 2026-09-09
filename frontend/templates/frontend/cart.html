@@ -9,31 +9,31 @@
   <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:index' %}">Back to dashboard</a>
 </div>
 
-{% if is_manager %}
-<div class="alert alert-warning rounded-4 shadow-sm mb-4">Manager view: you can review catalog and order activity from this dashboard.</div>
-{% else %}
-<div class="alert alert-info rounded-4 shadow-sm mb-4">Customer view: your cart and past orders are shown here for checkout and tracking.</div>
-{% endif %}
-
 <div class="card shadow-sm border-0 rounded-4">
   <div class="card-body">
-    {% if cart_items %}
+    {% if items %}
     <div class="table-responsive">
       <table class="table align-middle mb-0">
         <thead class="table-light">
           <tr>
             <th>Item</th>
-            <th>Category</th>
             <th>Qty</th>
             <th>Unit price</th>
-            <th>Total</th>
+            <th>Line total</th>
           </tr>
         </thead>
         <tbody>
-          {% for item in cart_items %}
+          {% for item in items %}
           <tr>
-            <td>{{ item.menuitem.title }}</td>
-            <td>{{ item.menuitem.category.title }}</td>
+            <!--
+              CartSerializer doesn't nest the menu item, so item.menuitem
+              is just its numeric ID, not an object with a .title. The
+              original template assumed item.menuitem.title, which would
+              have silently rendered nothing. Showing the raw ID here as
+              a placeholder — nesting menuitem in CartSerializer (or
+              looking titles up separately) is a serializer-level fix.
+            -->
+            <td>Item #{{ item.menuitem }}</td>
             <td>{{ item.quantity }}</td>
             <td>${{ item.unit_price }}</td>
             <td>${{ item.price }}</td>
@@ -42,9 +42,24 @@
         </tbody>
       </table>
     </div>
-    <div class="d-flex justify-content-between align-items-center mt-3 border-top pt-3">
-      <span class="fw-semibold">Grand total</span>
-      <span class="h5 mb-0">${{ total }}</span>
+    <!--
+      No grand total here: cart_view only passes "items" to the template,
+      it never computes a sum. Django templates can't add a list of
+      Decimals on their own, so this needs a one-line addition in
+      cart_view (e.g. total = sum(Decimal(i["price"]) for i in items))
+      passed in context if you want a grand total shown.
+    -->
+    <div class="d-flex gap-2 mt-3 border-top pt-3">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="clear" />
+        <button type="submit" class="btn btn-outline-danger btn-sm">Clear cart</button>
+      </form>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="checkout" />
+        <button type="submit" class="btn btn-success btn-sm">Checkout</button>
+      </form>
     </div>
     {% else %}
     <div class="alert alert-info mb-0">Your cart is empty right now.</div>
