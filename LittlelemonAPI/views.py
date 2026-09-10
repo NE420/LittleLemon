@@ -1,69 +1,42 @@
+from urllib import request
+
 from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import Group, User
+from rest_framework import viewsets, status
+
 from .models import Category, menuItem, Cart, Order, OrderItem
 from .serializers import CategorySerializer, MenuItemSerializer, CartSerializer, OrderSerializer, UserSerilializer
-from rest_framework.response import Response
-
-from rest_framework.permissions import IsAdminUser
-from django.shortcuts import get_object_or_404
-
-from django.contrib.auth.models import Group, User
-
-from rest_framework import viewsets
-from rest_framework import status
-
-
-def is_manager(user):
-    return bool(user and (user.is_superuser or user.groups.filter(name='Manager').exists()))
+from .permissions import IsManager, IsManagerOrReadOnly, CanUpdateOrder, DeliveryCrewPermission
 
 
 class CategoriesView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-
-    def get_permissions(self):
-        permission_classes = []
-        if self.request.method != 'GET':
-            permission_classes = [IsAuthenticated]
-
-        return [permission() for permission in permission_classes]
-
-class MenuItemsView(generics.ListCreateAPIView):
-    queryset = menuItem.objects.all()
-    serializer_class = MenuItemSerializer
-    search_fields = ['category__title']
-    ordering_fields = ['price', 'inventory']
-
-    def get_permissions(self):
-        permission_classes = []
-        if self.request.method != 'GET':
-            permission_classes = [IsAuthenticated]
-
-        return [permission() for permission in permission_classes]
-
+    permission_classes = [IsManagerOrReadOnly]
+   
 
 class SingleCategoryView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsManagerOrReadOnly]
 
-    def get_permissions(self):
-        permission_classes = []
-        if self.request.method != 'GET':
-            permission_classes = [IsAuthenticated]
 
-        return [permission() for permission in permission_classes]
-
+class MenuItemsView(generics.ListCreateAPIView):
+    queryset = menuItem.objects.all()
+    serializer_class = MenuItemSerializer
+    permission_classes = [IsManagerOrReadOnly]
+    search_fields = ['category__title']
+    ordering_fields = ['price', 'inventory']
+    
 
 class SingleMenuItemView(generics.RetrieveUpdateDestroyAPIView):
     queryset = menuItem.objects.all()
     serializer_class = MenuItemSerializer
+    permission_classes = [IsManagerOrReadOnly]
 
-    def get_permissions(self):
-        permission_classes = []
-        if self.request.method != 'GET':
-            permission_classes = [IsAuthenticated]
-
-        return [permission() for permission in permission_classes]
 
 class CartView(generics.ListCreateAPIView):
     queryset = Cart.objects.all()
@@ -83,9 +56,6 @@ class OrderView(generics.ListCreateAPIView):
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_permissions(self):
-        return [IsAuthenticated()]
-
     def get_queryset(self):
         user = self.request.user
         if not user or not user.is_authenticated:
@@ -100,39 +70,32 @@ class OrderView(generics.ListCreateAPIView):
         if user.groups.filter(name='Delivery crew').exists():
             return Order.objects.all().filter(delivery_crew=user)
         return Order.objects.all()
-        # else:
-        #     return Order.objects.all()
 
     def create(self, request, *args, **kwargs):
         menuitem_count = Cart.objects.all().filter(user=self.request.user).count()
         if menuitem_count == 0:
             return Response({"message:": "no item in cart"})
 
-        data = request.data.copy()
         total = self.get_total_price(self.request.user)
-        data['total'] = total
-        data['user'] = self.request.user.id
-        order_serializer = OrderSerializer(data=data)
-        if (order_serializer.is_valid()):
-            order = order_serializer.save()
 
+        order_serializer = OrderSerializer(data=request.data)
+        if order_serializer.is_valid():
+            order = order_serializer.save(user=self.request.user, total=total)
+            
             items = Cart.objects.all().filter(user=self.request.user).all()
-
             for item in items.values():
-                orderitem = OrderItem(
+                OrderItem.objects.create(
                     order=order,
                     menuitem_id=item['menuitem_id'],
                     price=item['price'],
                     quantity=item['quantity'],
                 )
-                orderitem.save()
-
-            Cart.objects.all().filter(user=self.request.user).delete() #Delete cart items
-
-            result = order_serializer.data.copy()
-            result['total'] = total
+            Cart.objects.all().filter(user=self.request.user).delete()
+            
             return Response(order_serializer.data)
-    
+        
+        return Response(order_serializer.errors, status=400)
+
     def get_total_price(self, user):
         total = 0
         items = Cart.objects.all().filter(user=user).all()
@@ -144,69 +107,34 @@ class OrderView(generics.ListCreateAPIView):
 class SingleOrderView(generics.RetrieveUpdateAPIView):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated]
-
-    def update(self, request, *args, **kwargs):
-        if self.request.user.groups.count()==0: # Normal user, not belonging to any group = Customer
-            return Response('Not Ok')
-        else: #everyone else - Super Admin, Manager and Delivery Crew
-            return super().update(request, *args, **kwargs)
+    permission_classes = [IsAuthenticated, CanUpdateOrder]
 
 
-
-class GroupViewSet(viewsets.ViewSet):
-    permission_classes = [IsAdminUser]
-
-    def get_permissions(self):
-        return [IsAdminUser()]
+class GroupMembershipViewSet(viewsets.ViewSet):
+    group_name = None  # override in subclass
 
     def list(self, request):
-        users = User.objects.all().filter(groups__name='Manager').distinct().order_by('username')
-        items = UserSerilializer(users, many=True)
-        return Response(items.data)
+        users = User.objects.filter(groups__name=self.group_name).distinct().order_by('username')
+        return Response(UserSerilializer(users, many=True).data)
 
     def create(self, request):
         user = get_object_or_404(User, username=request.data['username'])
-        managers = Group.objects.get(name="Manager")
-        managers.user_set.add(user)
-        return Response({"message": "user added to the manager group"}, 200)
+        group = Group.objects.get(name=self.group_name)
+        group.user_set.add(user)
+        return Response({"message": f"user added to the {self.group_name} group"}, 200)
 
     def destroy(self, request):
         user = get_object_or_404(User, username=request.data['username'])
-        managers = Group.objects.get(name="Manager")
-        managers.user_set.remove(user)
-        return Response({"message": "user removed from the manager group"}, 200)
-
-class DeliveryCrewViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
-
-    def get_permissions(self):
-        return [IsAuthenticated()]
-
-    def list(self, request):
-        users = User.objects.all().filter(groups__name='Delivery crew').distinct().order_by('username')
-        items = UserSerilializer(users, many=True)
-        return Response(items.data)
-
-    def create(self, request):
-        #only for super admin and managers
-        if self.request.user.is_superuser == False:
-            if self.request.user.groups.filter(name='Manager').exists() == False:
-                return Response({"message":"forbidden"}, status.HTTP_403_FORBIDDEN)
-
-        user = get_object_or_404(User, username=request.data['username'])
-        dc = Group.objects.get(name="Delivery crew")
-        dc.user_set.add(user)
-        return Response({"message": "user added to the delivery crew group"}, 200)
-
-    def destroy(self, request):
-        #only for super admin and managers
-        if self.request.user.is_superuser == False:
-            if self.request.user.groups.filter(name='Manager').exists() == False:
-                return Response({"message":"forbidden"}, status.HTTP_403_FORBIDDEN)
-        user = get_object_or_404(User, username=request.data['username'])
-        dc = Group.objects.get(name="Delivery crew")
-        dc.user_set.remove(user)
-        return Response({"message": "user removed from the delivery crew group"}, 200)
+        group = Group.objects.get(name=self.group_name)
+        group.user_set.remove(user)
+        return Response({"message": f"user removed from the {self.group_name} group"}, 200)
 
 
+class GroupViewSet(GroupMembershipViewSet):
+    group_name = "Manager"
+    permission_classes = [IsManager]
+    
+    
+class DeliveryCrewViewSet(GroupMembershipViewSet):
+    group_name = "Delivery crew"
+    permission_classes = [DeliveryCrewPermission]

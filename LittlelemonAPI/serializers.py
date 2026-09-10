@@ -12,9 +12,13 @@ class CategorySerializer (serializers.ModelSerializer):
 
 
 class MenuItemSerializer(serializers.ModelSerializer):
-    category = serializers.PrimaryKeyRelatedField(
-    queryset= Category.objects.all()
+    category = serializers.SlugRelatedField(
+        slug_field='title',
+        queryset=Category.objects.all()
     )
+    # category = serializers.PrimaryKeyRelatedField(
+    # queryset= Category.objects.all()
+    # )
     # category = CategorySerializer(read_only=True)
     class Meta:
         model = menuItem
@@ -49,11 +53,18 @@ class OrderItemSerializer(serializers.ModelSerializer):
 class OrderSerializer(serializers.ModelSerializer):
 
     orderitem = OrderItemSerializer(many=True, read_only=True, source='order')
-
+    delivery_crew = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(groups__name='Delivery crew'),
+        required=False,
+        allow_null=True,
+    )
     class Meta:
         model = Order
         fields = ['id', 'user', 'delivery_crew',
                   'status', 'date', 'total', 'orderitem']
+        extra_kwargs = {
+            'total': {'read_only': True}
+        }
 
 
 class UserSerilializer(serializers.ModelSerializer):
