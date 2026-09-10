@@ -31,8 +31,8 @@ class CartSerializer(serializers.ModelSerializer):
         default=serializers.CurrentUserDefault()
     )
 
-
     def validate(self, attrs):
+        attrs['unit_price'] = attrs['menuitem'].price
         attrs['price'] = attrs['quantity'] * attrs['unit_price']
         return attrs
 
@@ -40,6 +40,7 @@ class CartSerializer(serializers.ModelSerializer):
         model = Cart
         fields = ['user', 'menuitem', 'unit_price', 'quantity', 'price']
         extra_kwargs = {
+            'unit_price': {'read_only': True},
             'price': {'read_only': True}
         }
 
