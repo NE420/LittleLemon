@@ -1,0 +1,26 @@
+{# Managers and delivery crew. Expects `order`, and `crew` for managers. #}
+<form method="post" action="{% url 'frontend:single-order' order.id %}" class="row g-2 mt-3">
+  {% csrf_token %}
+  <input type="hidden" name="next_query" value="{{ request.GET.urlencode }}" />
+  <div class="col-12">
+    <label class="form-label small text-muted mb-1" for="status-{{ order.id }}">Status</label>
+    <select id="status-{{ order.id }}" name="status" class="form-select form-select-sm">
+      <option value="0"{% if not order.status %} selected{% endif %}>Pending</option>
+      <option value="1"{% if order.status %} selected{% endif %}>Completed</option>
+    </select>
+  </div>
+  {% if is_manager and crew %}
+  <div class="col-12">
+    <label class="form-label small text-muted mb-1" for="crew-{{ order.id }}">Delivery crew</label>
+    <select id="crew-{{ order.id }}" name="delivery_crew" class="form-select form-select-sm">
+      <option value=""{% if not order.delivery_crew %} selected{% endif %}>Unassigned</option>
+      {% for member in crew %}
+      <option value="{{ member.id }}"{% if member.id == order.delivery_crew %} selected{% endif %}>{{ member.username }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div class="col-12">
+    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Update order</button>
+  </div>
+</form>

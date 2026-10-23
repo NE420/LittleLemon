@@ -1,0 +1,15 @@
+{# Expects `page` from views.paginate(). Renders nothing when there is only one page. #}
+{% if page.has_other_pages %}
+<nav class="mt-4" aria-label="Pagination">
+  <ul class="pagination justify-content-center mb-2">
+    <li class="page-item{% if not page.has_previous %} disabled{% endif %}">
+      <a class="page-link" href="{% if page.has_previous %}?page={{ page.previous_number }}{{ page.query }}{% else %}#{% endif %}">Previous</a>
+    </li>
+    <li class="page-item active"><span class="page-link">Page {{ page.number }}</span></li>
+    <li class="page-item{% if not page.has_next %} disabled{% endif %}">
+      <a class="page-link" href="{% if page.has_next %}?page={{ page.next_number }}{{ page.query }}{% else %}#{% endif %}">Next</a>
+    </li>
+  </ul>
+  <p class="text-center text-muted small mb-0">{{ page.count }} in total</p>
+</nav>
+{% endif %}

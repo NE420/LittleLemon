@@ -1,0 +1,11 @@
+{# Customer-only. Expects `item`. Posts to the cart view. #}
+<form method="post" action="{% url 'frontend:cart' %}" class="d-flex gap-2 align-items-end">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="add" />
+  <input type="hidden" name="item_id" value="{{ item.id }}" />
+  <div>
+    <label class="form-label small text-muted mb-1" for="qty-{{ item.id }}">Quantity</label>
+    <input id="qty-{{ item.id }}" type="number" name="quantity" value="1" min="1" class="form-control form-control-sm" style="width: 5rem;" />
+  </div>
+  <button type="submit" class="btn btn-outline-success btn-sm flex-grow-1">Add to cart</button>
+</form>

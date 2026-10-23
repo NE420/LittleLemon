@@ -8,8 +8,8 @@ LOGOUT_ENDPOINT = f"{AUTH_BASE_URL}/token/logout/"
 CURRENT_USER_ENDPOINT = f"{AUTH_BASE_URL}/users/me/"
  
  
-class APIError(Exception): #Raised when the backend returns a non-2xx response.
-    
+class APIError(Exception):
+    """Raised when the backend returns a non-2xx response."""
     def __init__(self, status_code, detail):
         self.status_code = status_code
         self.detail = detail
@@ -33,12 +33,32 @@ def _handle(response):
     if response.status_code == 204 or not response.content:
         return None
     return response.json()
+
+
+def get_all(url, params=None, token=None):
+    """
+    The backend uses DRF's PageNumberPagination, so list endpoints return
+    {"count", "next", "previous", "results"} rather than a bare list.
+    This follows the "next" links and returns ONE flat list. Use it for
+    data you need in full (dropdowns, cart totals); use the plain get_*
+    functions when you want a single page plus its paging info.
+    """
+    data = _handle(requests.get(url, params=params or {}, headers=_headers(token)))
+    if isinstance(data, list):
+        return data
+    results = list(data.get("results", []))
+    next_url = data.get("next")
+    while next_url:
+        data = _handle(requests.get(next_url, headers=_headers(token)))
+        results.extend(data.get("results", []))
+        next_url = data.get("next")
+    return results
  
  
 # ---------- Auth ----------
  
-def login(username, password): #Returns Djoser's payload: {'auth_token': '...'}
-    
+def login(username, password):
+    """Returns Djoser's payload: {'auth_token': '...'}"""
     resp = requests.post(
         LOGIN_ENDPOINT,
         data={"username": username, "password": password},
@@ -46,23 +66,36 @@ def login(username, password): #Returns Djoser's payload: {'auth_token': '...'}
     return _handle(resp)
  
  
-def logout(token): #Invalidates the token server-side (Djoser deletes it).
-    
+def logout(token):
+    """Invalidates the token server-side (Djoser deletes it)."""
     resp = requests.post(LOGOUT_ENDPOINT, headers=_headers(token))
     return _handle(resp)
  
  
 def get_current_user(token):
-
+    """
+    Djoser's default UserSerializer only returns id/username/email —
+    no groups. If you need role info here (Manager / Delivery crew /
+    Customer) on the frontend, either:
+      a) customize DJOSER['SERIALIZERS']['current_user'] on the backend
+         to include groups, or
+      b) keep using the try/except-403 approach in views.py.
+    """
     resp = requests.get(CURRENT_USER_ENDPOINT, headers=_headers(token))
     return _handle(resp)
  
  
 # ---------- Categories ----------
  
-def get_categories():
-    resp = requests.get(f"{BASE_URL}/categories")
+def get_categories(params=None):
+    """One page: {'count', 'next', 'previous', 'results'}"""
+    resp = requests.get(f"{BASE_URL}/categories", params=params or {})
     return _handle(resp)
+
+
+def get_all_categories():
+    """Every category as a flat list (follows pagination)."""
+    return get_all(f"{BASE_URL}/categories")
  
  
 def create_category(data, token):
@@ -101,8 +134,8 @@ def delete_menu_item(item_id, token):
 # ---------- Cart ----------
  
 def get_cart(token):
-    resp = requests.get(f"{BASE_URL}/cart/menu-items", headers=_headers(token))
-    return _handle(resp)
+    """The whole cart as a flat list (follows pagination)."""
+    return get_all(f"{BASE_URL}/cart/menu-items", token=token)
  
  
 def add_to_cart(data, token):
@@ -118,8 +151,9 @@ def clear_cart(token):
  
 # ---------- Orders ----------
  
-def get_orders(token):
-    resp = requests.get(f"{BASE_URL}/orders", headers=_headers(token))
+def get_orders(token, params=None):
+    """One page: {'count', 'next', 'previous', 'results'}"""
+    resp = requests.get(f"{BASE_URL}/orders", params=params or {}, headers=_headers(token))
     return _handle(resp)
  
  

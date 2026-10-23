@@ -26,10 +26,7 @@ class MenuItemSerializer(serializers.ModelSerializer):
 
 
 class CartSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
-        default=serializers.CurrentUserDefault()
-    )
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
 
     def validate(self, attrs):
         attrs['unit_price'] = attrs['menuitem'].price
@@ -40,8 +37,9 @@ class CartSerializer(serializers.ModelSerializer):
         model = Cart
         fields = ['user', 'menuitem', 'unit_price', 'quantity', 'price']
         extra_kwargs = {
+            'quantity': {'min_value': 1},
             'unit_price': {'read_only': True},
-            'price': {'read_only': True}
+            'price': {'read_only': True},
         }
 
 
@@ -53,7 +51,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
 
-    orderitem = OrderItemSerializer(many=True, read_only=True, source='order')
+    orderitem = OrderItemSerializer(many=True, read_only=True, source='orderitem_set')
     delivery_crew = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(groups__name='Delivery crew'),
         required=False,
@@ -67,6 +65,15 @@ class OrderSerializer(serializers.ModelSerializer):
             'total': {'read_only': True}
         }
 
+class OrderUpdateSerializer(serializers.ModelSerializer):
+    delivery_crew = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(groups__name='Delivery crew'),
+        allow_null=True, required=False,
+    )
+
+    class Meta:
+        model = Order
+        fields = ['status', 'delivery_crew']
 
 class UserSerilializer(serializers.ModelSerializer):
     class Meta:
@@ -75,6 +82,8 @@ class UserSerilializer(serializers.ModelSerializer):
 
 class CurrentUserSerializer(serializers.ModelSerializer):
     groups = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'groups']
+        fields = ['id', 'username', 'email', 'groups', 'is_staff', 'is_superuser']
+        read_only_fields = ['username', 'is_staff', 'is_superuser']

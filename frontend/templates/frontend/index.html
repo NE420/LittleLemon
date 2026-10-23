@@ -1,16 +1,31 @@
 {% extends 'frontend/base.html' %}
 
+{% block title %}Dashboard · LittleLemon{% endblock %}
+
 {% block content %}
 <div class="row g-4 align-items-stretch">
   <div class="col-12 col-xl-7">
     <div class="card shadow-sm border-0 rounded-4 h-100">
       <div class="card-body p-4">
-        <p class="text-uppercase small text-primary fw-semibold mb-2">Overview</p>
-        <h1 class="display-6 fw-bold mb-3">A clean, responsive dashboard for LittleLemon.</h1>
-        <p class="text-muted mb-4">Browse categories, filter menu items, review carts and orders, and inspect manager and delivery-crew groups from one responsive interface.</p>
+        <h1 class="display-6 fw-bold mb-3">LittleLemon dashboard</h1>
+        <p class="text-muted mb-4">
+          {% if is_manager %}
+          Manage the menu and categories, follow orders, and look after the delivery crew.
+          {% elif is_delivery_crew %}
+          See the orders assigned to you and mark them completed once they're delivered.
+          {% elif is_customer %}
+          Browse the menu, fill your cart, and follow your orders.
+          {% else %}
+          Browse the menu and categories. Log in to order.
+          {% endif %}
+        </p>
         <div class="d-flex flex-wrap gap-2">
-          <a class="btn btn-primary" href="{% url 'frontend:menu-items' %}">Explore menu</a>
+          <a class="btn btn-primary" href="{% url 'frontend:menu-items' %}">Explore the menu</a>
+          {% if logged_in %}
           <a class="btn btn-outline-secondary" href="{% url 'frontend:orders' %}">View orders</a>
+          {% else %}
+          <a class="btn btn-outline-secondary" href="{% url 'frontend:login' %}">Log in</a>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -21,7 +36,7 @@
       <div class="col-6">
         <div class="card shadow-sm border-0 rounded-4 h-100">
           <div class="card-body">
-            <p class="text-uppercase small text-muted mb-1">{{ label|title }}</p>
+            <p class="small text-muted mb-1">{{ label|capfirst }}</p>
             <h3 class="fw-bold mb-0">{{ value }}</h3>
           </div>
         </div>
@@ -31,15 +46,51 @@
   </div>
 </div>
 
-<div class="row g-4 mt-1">
+{% if menu_preview %}
+<h2 class="h5 fw-semibold mt-5 mb-3">From the menu</h2>
+<div class="row g-4">
+  {% for item in menu_preview %}
   <div class="col-12 col-md-6 col-lg-4">
-    <div class="card shadow-sm border-0 rounded-4 h-100"><div class="card-body"><h5 class="card-title">Categories</h5><p class="text-muted">Review all menu categories.</p><a href="{% url 'frontend:categories' %}" class="btn btn-outline-dark btn-sm">Open</a></div></div>
+    <div class="card shadow-sm border-0 rounded-4 h-100">
+      <div class="card-body d-flex justify-content-between align-items-start">
+        <div>
+          <h3 class="h6 fw-semibold mb-1">{{ item.title }}</h3>
+          {% if item.featured %}<span class="badge text-bg-warning">Featured</span>{% endif %}
+        </div>
+        <strong>${{ item.price }}</strong>
+      </div>
+    </div>
   </div>
-  <div class="col-12 col-md-6 col-lg-4">
-    <div class="card shadow-sm border-0 rounded-4 h-100"><div class="card-body"><h5 class="card-title">Menu items</h5><p class="text-muted">Search and category filter to browse items quickly.</p><a href="{% url 'frontend:menu-items' %}" class="btn btn-outline-dark btn-sm">Open</a></div></div>
-  </div>
-  <div class="col-12 col-md-6 col-lg-4">
-    <div class="card shadow-sm border-0 rounded-4 h-100"><div class="card-body"><h5 class="card-title">Orders</h5><p class="text-muted">Track orders and keep the delivery organized.</p><a href="{% url 'frontend:orders' %}" class="btn btn-outline-dark btn-sm">Open</a></div></div>
-  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="h5 fw-semibold mt-5 mb-3">Quick links</h2>
+<div class="row g-4">
+  {% url 'frontend:categories' as categories_url %}
+  {% include "frontend/partials/_quick_link.html" with title="Categories" text="Browse every menu category." href=categories_url %}
+
+  {% url 'frontend:menu-items' as menu_url %}
+  {% include "frontend/partials/_quick_link.html" with title="Menu" text="Search and sort the menu." href=menu_url %}
+
+  {% if logged_in %}
+  {% url 'frontend:orders' as orders_url %}
+  {% include "frontend/partials/_quick_link.html" with title="Orders" text="Follow orders and their delivery." href=orders_url %}
+  {% endif %}
+
+  {% if is_customer %}
+  {% url 'frontend:cart' as cart_url %}
+  {% include "frontend/partials/_quick_link.html" with title="Cart" text="Review your cart and check out." href=cart_url %}
+  {% endif %}
+
+  {% if is_manager %}
+  {% url 'frontend:delivery-crew' as crew_url %}
+  {% include "frontend/partials/_quick_link.html" with title="Delivery crew" text="Add or remove delivery crew members." href=crew_url %}
+  {% endif %}
+
+  {% if is_admin %}
+  {% url 'frontend:managers' as managers_url %}
+  {% include "frontend/partials/_quick_link.html" with title="Managers" text="Add or remove managers." href=managers_url %}
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,23 +1,24 @@
 {% extends 'frontend/base.html' %}
 
+{% block title %}Log in · LittleLemon{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-md-8 col-lg-5">
     <div class="card shadow-sm border-0 rounded-4">
       <div class="card-body p-4">
-        <p class="text-uppercase small text-primary fw-semibold mb-2">Authentication</p>
-        <h2 class="h3 fw-bold mb-3">Sign in to LittleLemon</h2>
-        <p class="text-muted mb-4">Use your Djoser credentials to receive a token and access the protected pages.</p>
+        <h2 class="h3 fw-bold mb-3">Log in to LittleLemon</h2>
+        <p class="text-muted mb-4">Use your LittleLemon username and password.</p>
 
         <form method="post">
           {% csrf_token %}
           <div class="mb-3">
             <label class="form-label" for="username">Username</label>
-            <input id="username" name="username" class="form-control" required />
+            <input id="username" name="username" class="form-control" autocomplete="username" required autofocus />
           </div>
           <div class="mb-3">
             <label class="form-label" for="password">Password</label>
-            <input id="password" name="password" type="password" class="form-control" required />
+            <input id="password" name="password" type="password" class="form-control" autocomplete="current-password" required />
           </div>
           <button type="submit" class="btn btn-primary w-100">Log in</button>
         </form>

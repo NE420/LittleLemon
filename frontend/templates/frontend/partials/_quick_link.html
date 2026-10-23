@@ -1,0 +1,10 @@
+{# Expects `title`, `text`, `href`. #}
+<div class="col-12 col-md-6 col-lg-4">
+  <div class="card shadow-sm border-0 rounded-4 h-100">
+    <div class="card-body">
+      <h3 class="h5 card-title">{{ title }}</h3>
+      <p class="text-muted">{{ text }}</p>
+      <a href="{{ href }}" class="btn btn-outline-dark btn-sm">Open {{ title|lower }}</a>
+    </div>
+  </div>
+</div>

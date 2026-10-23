@@ -1,0 +1,21 @@
+{# Manager-only. Include inside {% if is_manager %}. #}
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-body">
+    <h3 class="h5 fw-semibold mb-3">Add a category</h3>
+    <form method="post" class="row g-3 align-items-end">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create" />
+      <div class="col-12 col-md-5">
+        <label class="form-label small text-muted" for="category-title">Title</label>
+        <input id="category-title" name="title" class="form-control" required />
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label small text-muted" for="category-slug">Slug</label>
+        <input id="category-slug" name="slug" class="form-control" required />
+      </div>
+      <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-success w-100">Add category</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>LittleLemon Admin UI</title>
+  <title>{% block title %}LittleLemon{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
 <body class="bg-light">
+  {% with current=request.resolver_match.url_name %}
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm sticky-top">
     <div class="container-fluid">
       <a class="navbar-brand fw-semibold" href="{% url 'frontend:index' %}">LittleLemon</a>
@@ -14,23 +15,47 @@
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navMenu">
-        <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:index' %}">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:categories' %}">Categories</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:menu-items' %}">Menu</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:cart' %}">Cart</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:orders' %}">Orders</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:managers' %}">Managers</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:delivery-crew' %}">Delivery Crew</a></li>
-          {% if request.session.auth_token %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:logout' %}">Logout ({{ request.session.username }})</a></li>
+        {# Links are only shown to roles that can use the page. The views enforce access too. #}
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link{% if current == 'index' %} active{% endif %}" href="{% url 'frontend:index' %}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link{% if current == 'categories' %} active{% endif %}" href="{% url 'frontend:categories' %}">Categories</a></li>
+          <li class="nav-item"><a class="nav-link{% if current == 'menu-items' %} active{% endif %}" href="{% url 'frontend:menu-items' %}">Menu</a></li>
+          {% if is_customer %}
+          <li class="nav-item"><a class="nav-link{% if current == 'cart' %} active{% endif %}" href="{% url 'frontend:cart' %}">Cart</a></li>
+          {% endif %}
+          {% if logged_in %}
+          <li class="nav-item"><a class="nav-link{% if current == 'orders' %} active{% endif %}" href="{% url 'frontend:orders' %}">Orders</a></li>
+          {% endif %}
+          {% if is_manager %}
+          <li class="nav-item"><a class="nav-link{% if current == 'delivery-crew' %} active{% endif %}" href="{% url 'frontend:delivery-crew' %}">Delivery crew</a></li>
+          {% endif %}
+          {% if is_admin %}
+          <li class="nav-item"><a class="nav-link{% if current == 'managers' %} active{% endif %}" href="{% url 'frontend:managers' %}">Managers</a></li>
+          {% endif %}
+        </ul>
+
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
+          {% if logged_in %}
+          <li class="nav-item">
+            <span class="navbar-text">
+              {{ current_username }}
+              <span class="badge text-bg-secondary ms-1">{% if is_admin %}Admin{% elif is_manager %}Manager{% elif is_delivery_crew %}Delivery crew{% else %}Customer{% endif %}</span>
+            </span>
+          </li>
+          <li class="nav-item">
+            <form method="post" action="{% url 'frontend:logout' %}">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+            </form>
+          </li>
           {% else %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'frontend:login' %}">Login</a></li>
+          <li class="nav-item"><a class="nav-link{% if current == 'login' %} active{% endif %}" href="{% url 'frontend:login' %}">Log in</a></li>
           {% endif %}
         </ul>
       </div>
     </div>
   </nav>
+  {% endwith %}
 
   <main class="container py-4">
     {% if messages %}

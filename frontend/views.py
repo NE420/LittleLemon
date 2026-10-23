@@ -1,24 +1,141 @@
-from django.shortcuts import render, redirect
+from decimal import Decimal
+from urllib.parse import parse_qsl, urlencode
+
 from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views import View
 
 from . import api_client
 from .api_client import APIError
 
+SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
+
 
 # ---------- Helpers ----------
 
-class TokenRequiredMixin:
-    
+def get_token(request):
+    return request.session.get("auth_token")
+
+
+def get_roles(request):
+    return request.session.get("roles", {})
+
+
+def derive_roles(user):
+    """Turn Djoser's /users/me/ payload into the flags the UI uses."""
+    groups = user.get("groups", [])
+    is_admin = bool(user.get("is_superuser") or user.get("is_staff"))
+    return {
+        "is_admin": is_admin,
+        "is_manager": is_admin or "Manager" in groups,
+        "is_delivery_crew": "Delivery crew" in groups,
+    }
+
+
+def describe(error):
+    """Turn an APIError into a short, readable message."""
+    detail = error.detail
+    if isinstance(detail, dict):
+        parts = []
+        for key, value in detail.items():
+            text = ", ".join(str(v) for v in value) if isinstance(value, (list, tuple)) else str(value)
+            parts.append(text if key in ("detail", "non_field_errors") else f"{key}: {text}")
+        text = "; ".join(parts)
+    elif isinstance(detail, list):
+        text = ", ".join(str(d) for d in detail)
+    else:
+        text = str(detail)
+    return text[:300]
+
+
+def results(data):
+    """DRF list payloads are paginated dicts; plain lists pass through."""
+    return data if isinstance(data, list) else data.get("results", [])
+
+
+def total_count(data):
+    return len(data) if isinstance(data, list) else data.get("count", 0)
+
+
+def api_params(request, *names):
+    """Pick the named GET params to forward to the API."""
+    return {name: request.GET[name] for name in names if request.GET.get(name)}
+
+
+def paginate(request, data, keep=()):
+    """
+    Split a paginated API response into (items, page). `page` feeds
+    partials/_pagination.html; `keep` lists the GET params (search, sort)
+    that the page links should carry along.
+    """
+    items = results(data)
+    if isinstance(data, list):
+        return items, None
+    try:
+        number = max(int(request.GET.get("page", 1)), 1)
+    except ValueError:
+        number = 1
+    extra = urlencode({k: request.GET[k] for k in keep if request.GET.get(k)})
+    has_previous = bool(data.get("previous"))
+    has_next = bool(data.get("next"))
+    return items, {
+        "number": number,
+        "count": data.get("count", len(items)),
+        "has_previous": has_previous,
+        "has_next": has_next,
+        "has_other_pages": has_previous or has_next,
+        "previous_number": number - 1,
+        "next_number": number + 1,
+        "query": f"&{extra}" if extra else "",
+    }
+
+
+def redirect_back(request, url_name):
+    """
+    Redirect to a list page, restoring the page / search / sort the person
+    was on. Forms on single-item views send that as a hidden `next_query`.
+    Only the query string is taken from the form, never the path.
+    """
+    url = reverse(url_name)
+    query = urlencode(parse_qsl(request.POST.get("next_query", "")))
+    return redirect(f"{url}?{query}" if query else url)
+
+
+# ---------- Access control ----------
+# Rule of thumb used throughout:
+#   * a whole page only some roles may open  -> gate it here, in the view
+#   * a page everyone opens, with extra controls for some roles
+#                                            -> one template + {% if is_manager %}
+# Templates only hide controls; these mixins (and ultimately the API) are
+# what actually refuse the request.
+
+class RoleRequiredMixin:
+    """
+    roles_any:            session role flags; having any one of them is enough
+                          (empty = just be logged in)
+    open_to_safe_methods: let anyone, even anonymous, GET the page
+    denied_url:           where people without the role are sent
+    """
+    roles_any = ()
+    open_to_safe_methods = False
+    denied_url = "frontend:index"
+
     def dispatch(self, request, *args, **kwargs):
-        if not request.session.get("auth_token"):
-            messages.error(request, "Please log in first.")
-            return redirect("frontend:login")
+        if not (self.open_to_safe_methods and request.method in SAFE_METHODS):
+            if not get_token(request):
+                messages.error(request, "Please log in first.")
+                return redirect("frontend:login")
+            if self.roles_any:
+                user_roles = get_roles(request)
+                if not any(user_roles.get(role) for role in self.roles_any):
+                    messages.error(request, "You don't have permission to do that.")
+                    return redirect(self.denied_url)
         return super().dispatch(request, *args, **kwargs)
 
 
-def get_token(request):
-    return request.session.get("auth_token")
+class TokenRequiredMixin(RoleRequiredMixin):
+    """Logged in is enough; no particular role."""
 
 
 # ---------- Home ----------
@@ -26,35 +143,27 @@ def get_token(request):
 class IndexView(View):
     def get(self, request):
         try:
-            all_items = api_client.get_menu_items({"ordering": "-id"})
-            all_items = all_items if isinstance(all_items, list) else []
+            menu_page = api_client.get_menu_items()
         except APIError:
-            all_items = []
+            menu_page = {}
         try:
-            categories = api_client.get_categories()
-            categories = categories if isinstance(categories, list) else []
+            category_page = api_client.get_categories()
         except APIError:
-            categories = []
-
-        token = get_token(request)
-        orders_count = None
-        if token:
-            try:
-                orders = api_client.get_orders(token)
-                orders_count = len(orders) if isinstance(orders, list) else None
-            except APIError:
-                orders_count = None
+            category_page = {}
 
         stats = {
-            "menu items": len(all_items),
-            "categories": len(categories),
+            "menu items": total_count(menu_page),
+            "categories": total_count(category_page),
         }
-        if orders_count is not None:
-            stats["orders"] = orders_count
+        token = get_token(request)
+        if token:
+            try:
+                stats["orders"] = total_count(api_client.get_orders(token))
+            except APIError:
+                pass
 
         return render(request, "frontend/index.html", {
-            "featured_items": all_items[:6],
-            "categories": categories,
+            "menu_preview": results(menu_page),
             "stats": stats,
         })
 
@@ -71,16 +180,31 @@ class LoginView(View):
         try:
             data = api_client.login(username, password)
         except APIError as e:
-            messages.error(request, f"Login failed: {e.detail}")
+            messages.error(request, f"Login failed: {describe(e)}")
             return render(request, "frontend/login.html")
 
-        request.session["auth_token"] = data.get("auth_token")
+        token = data.get("auth_token")
+        # Look the person's roles up once and keep them in the session.
+        # They change when someone is added to / removed from a group, and
+        # show up after the next login.
+        try:
+            roles = derive_roles(api_client.get_current_user(token))
+        except APIError:
+            roles = {}
+            messages.warning(
+                request,
+                "Logged in, but your role couldn't be loaded, so manager "
+                "features are hidden. Check the Djoser current_user serializer.",
+            )
+
+        request.session["auth_token"] = token
         request.session["username"] = username
+        request.session["roles"] = roles
         return redirect("frontend:index")
 
 
 class LogoutView(View):
-    def get(self, request):
+    def post(self, request):
         token = get_token(request)
         if token:
             try:
@@ -92,89 +216,90 @@ class LogoutView(View):
 
 
 # ---------- Categories ----------
-# categories.html: expects `categories` (list). Manager-only inline
-# "add category" form POSTs here with action=create.
+# Everyone can browse. Only managers see the create form, and only
+# managers get past the mixin on POST.
 
-class CategoriesView(View):
+class CategoriesView(RoleRequiredMixin, View):
+    roles_any = ("is_manager",)
+    open_to_safe_methods = True
+    denied_url = "frontend:categories"
+
     def get(self, request):
         try:
-            categories = api_client.get_categories()
+            categories = api_client.get_all_categories()
         except APIError as e:
-            messages.error(request, f"Could not load categories: {e.detail}")
+            messages.error(request, f"Could not load categories: {describe(e)}")
             categories = []
         return render(request, "frontend/categories.html", {"categories": categories})
 
     def post(self, request):
-        if request.POST.get("action") != "create":
-            return redirect("frontend:categories")
-
-        token = get_token(request)
-        if not token:
-            messages.error(request, "Please log in first.")
-            return redirect("frontend:login")
-
-        data = {"title": request.POST.get("title"), "slug": request.POST.get("slug")}
-        try:
-            api_client.create_category(data, token)
-            messages.success(request, "Category created.")
-        except APIError as e:
-            messages.error(request, f"Could not create category: {e.detail}")
+        if request.POST.get("action") == "create":
+            data = {"title": request.POST.get("title"), "slug": request.POST.get("slug")}
+            try:
+                api_client.create_category(data, get_token(request))
+                messages.success(request, "Category created.")
+            except APIError as e:
+                messages.error(request, f"Could not create category: {describe(e)}")
         return redirect("frontend:categories")
 
 
 # ---------- Menu items ----------
+# MenuItemsView: list + create (menu-items/)
+# SingleMenuItemView: update / delete one item (menu-items/<pk>/)
 
-class MenuItemsView(View):
+class MenuItemsView(RoleRequiredMixin, View):
+    roles_any = ("is_manager",)
+    open_to_safe_methods = True
+    denied_url = "frontend:menu-items"
+
     def get(self, request):
-        params = {}
-        if request.GET.get("search"):
-            params["search"] = request.GET["search"]
-        if request.GET.get("ordering"):
-            params["ordering"] = request.GET["ordering"]
-
+        params = api_params(request, "search", "ordering", "page")
         try:
-            items = api_client.get_menu_items(params)
+            items, page = paginate(
+                request, api_client.get_menu_items(params), keep=("search", "ordering")
+            )
         except APIError as e:
-            messages.error(request, f"Could not load menu: {e.detail}")
-            items = []
+            messages.error(request, f"Could not load the menu: {describe(e)}")
+            items, page = [], None
 
         try:
-            categories = api_client.get_categories()
+            categories = api_client.get_all_categories()
         except APIError:
             categories = []
 
-        return render(request, "frontend/menu_items.html", {"items": items, "categories": categories})
+        # The API returns each item's category as a bare id.
+        titles = {c["id"]: c["title"] for c in categories}
+        for item in items:
+            item["category_title"] = titles.get(item["category"], "Uncategorised")
+
+        return render(request, "frontend/menu_items.html", {
+            "items": items,
+            "categories": categories,
+            "page": page,
+        })
 
     def post(self, request):
-        if request.POST.get("action") != "create":
-            return redirect("frontend:menu-items")
-
-        token = get_token(request)
-        if not token:
-            messages.error(request, "Please log in first.")
-            return redirect("frontend:login")
-
-        data = {
-            "title": request.POST.get("title"),
-            "price": request.POST.get("price"),
-            "category": request.POST.get("category"),
-            "featured": request.POST.get("featured") == "on",
-        }
-        try:
-            api_client.create_menu_item(data, token)
-            messages.success(request, "Menu item created.")
-        except APIError as e:
-            messages.error(request, f"Could not create item: {e.detail}")
+        if request.POST.get("action") == "create":
+            data = {
+                "title": request.POST.get("title"),
+                "price": request.POST.get("price"),
+                "category": request.POST.get("category"),
+                "featured": request.POST.get("featured") == "on",
+            }
+            try:
+                api_client.create_menu_item(data, get_token(request))
+                messages.success(request, "Menu item created.")
+            except APIError as e:
+                messages.error(request, f"Could not create item: {describe(e)}")
         return redirect("frontend:menu-items")
 
 
-class SingleMenuItemView(View):
+class SingleMenuItemView(RoleRequiredMixin, View):
+    roles_any = ("is_manager",)
+    denied_url = "frontend:menu-items"
+
     def post(self, request, pk):
         token = get_token(request)
-        if not token:
-            messages.error(request, "Please log in first.")
-            return redirect("frontend:login")
-
         action = request.POST.get("action")
 
         if action == "update":
@@ -182,30 +307,28 @@ class SingleMenuItemView(View):
                 "title": request.POST.get("title"),
                 "price": request.POST.get("price"),
                 "category": request.POST.get("category"),
+                "featured": request.POST.get("featured") == "on",
             }
             try:
                 api_client.update_menu_item(pk, data, token)
                 messages.success(request, "Menu item updated.")
             except APIError as e:
-                messages.error(request, f"Could not update item: {e.detail}")
+                messages.error(request, f"Could not update item: {describe(e)}")
 
         elif action == "delete":
             try:
                 api_client.delete_menu_item(pk, token)
                 messages.success(request, "Menu item deleted.")
             except APIError as e:
-                messages.error(request, f"Could not delete item: {e.detail}")
+                messages.error(request, f"Could not delete item: {describe(e)}")
 
-        return redirect("frontend:menu-items")
+        return redirect_back(request, "frontend:menu-items")
 
 
 # ---------- Cart ----------
-# cart.html: expects `items` (list). A per-item "add" form elsewhere
-# (menu_items.html) also POSTs here with action=add.
-#
-#   action=add      -> item_id, quantity
-#   action=clear     -> (no fields)
-#   action=checkout   -> (no fields)
+#   action=add       -> item_id, quantity
+#   action=clear
+#   action=checkout
 
 class CartView(TokenRequiredMixin, View):
     def get(self, request):
@@ -213,9 +336,22 @@ class CartView(TokenRequiredMixin, View):
         try:
             items = api_client.get_cart(token)
         except APIError as e:
-            messages.error(request, f"Could not load cart: {e.detail}")
+            messages.error(request, f"Could not load your cart: {describe(e)}")
             items = []
-        return render(request, "frontend/cart.html", {"items": items})
+
+        # Cart lines only carry the menu item's id; look the titles up.
+        titles = {}
+        for line in items:
+            menu_id = line["menuitem"]
+            if menu_id not in titles:
+                try:
+                    titles[menu_id] = api_client.get_menu_item(menu_id)["title"]
+                except APIError:
+                    titles[menu_id] = f"Item #{menu_id}"
+            line["menuitem_title"] = titles[menu_id]
+
+        total = sum((Decimal(str(line["price"])) for line in items), Decimal("0"))
+        return render(request, "frontend/cart.html", {"items": items, "total": total})
 
     def post(self, request):
         token = get_token(request)
@@ -223,7 +359,10 @@ class CartView(TokenRequiredMixin, View):
 
         if action == "add":
             item_id = request.POST.get("item_id")
-            quantity = int(request.POST.get("quantity", 1))
+            try:
+                quantity = max(int(request.POST.get("quantity", 1)), 1)
+            except ValueError:
+                quantity = 1
             try:
                 menu_item = api_client.get_menu_item(item_id)
                 data = {
@@ -233,16 +372,16 @@ class CartView(TokenRequiredMixin, View):
                     "price": float(menu_item["price"]) * quantity,
                 }
                 api_client.add_to_cart(data, token)
-                messages.success(request, "Added to cart.")
+                messages.success(request, f"Added {menu_item['title']} to your cart.")
             except APIError as e:
-                messages.error(request, f"Could not add to cart: {e.detail}")
+                messages.error(request, f"Could not add to cart: {describe(e)}")
 
         elif action == "clear":
             try:
                 api_client.clear_cart(token)
                 messages.success(request, "Cart cleared.")
             except APIError as e:
-                messages.error(request, f"Could not clear cart: {e.detail}")
+                messages.error(request, f"Could not clear the cart: {describe(e)}")
 
         elif action == "checkout":
             try:
@@ -250,52 +389,74 @@ class CartView(TokenRequiredMixin, View):
                 messages.success(request, "Order placed.")
                 return redirect("frontend:orders")
             except APIError as e:
-                messages.error(request, f"Checkout failed: {e.detail}")
+                messages.error(request, f"Checkout failed: {describe(e)}")
 
         return redirect("frontend:cart")
 
 
 # ---------- Orders ----------
-# order addressed by pk in the URL (orders/<int:pk>/).
+# OrdersView: list (customers see their own, delivery crew see theirs,
+# managers see all). SingleOrderView: update one order (orders/<pk>/).
 
 class OrdersView(TokenRequiredMixin, View):
     def get(self, request):
         token = get_token(request)
         try:
-            orders = api_client.get_orders(token)
+            orders, page = paginate(
+                request, api_client.get_orders(token, api_params(request, "page"))
+            )
         except APIError as e:
-            messages.error(request, f"Could not load orders: {e.detail}")
-            orders = []
-        return render(request, "frontend/orders.html", {"orders": orders})
+            messages.error(request, f"Could not load orders: {describe(e)}")
+            orders, page = [], None
+
+        # Managers assign orders to crew members, so they need the crew list.
+        crew = []
+        if get_roles(request).get("is_manager"):
+            try:
+                crew = api_client.list_delivery_crew(token)
+            except APIError:
+                crew = []
+
+        return render(request, "frontend/orders.html", {
+            "orders": orders,
+            "crew": crew,
+            "page": page,
+        })
 
 
-class SingleOrderView(TokenRequiredMixin, View):
+class SingleOrderView(RoleRequiredMixin, View):
+    roles_any = ("is_manager", "is_delivery_crew")
+    denied_url = "frontend:orders"
+
     def post(self, request, pk):
-        token = get_token(request)
         data = {}
-        if request.POST.get("status") not in (None, ""):
-            data["status"] = request.POST.get("status")
-        if request.POST.get("delivery_crew"):
-            data["delivery_crew"] = request.POST.get("delivery_crew")
-        try:
-            api_client.update_order(pk, data, token)
-            messages.success(request, "Order updated.")
-        except APIError as e:
-            messages.error(request, f"Could not update order: {e.detail}")
-        return redirect("frontend:orders")
+        if request.POST.get("status") in ("0", "1"):
+            data["status"] = request.POST["status"]
+        # Only managers hand orders to the crew; the crew just update status.
+        if get_roles(request).get("is_manager") and "delivery_crew" in request.POST:
+            data["delivery_crew"] = request.POST["delivery_crew"] or None
+
+        if data:
+            try:
+                api_client.update_order(pk, data, get_token(request))
+                messages.success(request, f"Order #{pk} updated.")
+            except APIError as e:
+                messages.error(request, f"Could not update order #{pk}: {describe(e)}")
+        return redirect_back(request, "frontend:orders")
 
 
-# ---------- Managers ----------
+# ---------- Managers (admins only) ----------
 #   action=add    -> username
 #   action=remove -> username
 
-class ManagersView(TokenRequiredMixin, View):
+class ManagersView(RoleRequiredMixin, View):
+    roles_any = ("is_admin",)
+
     def get(self, request):
-        token = get_token(request)
         try:
-            managers = api_client.list_managers(token)
+            managers = api_client.list_managers(get_token(request))
         except APIError as e:
-            messages.error(request, f"Not authorized: {e.detail}")
+            messages.error(request, f"Could not load managers: {describe(e)}")
             managers = []
         return render(request, "frontend/managers.html", {"managers": managers})
 
@@ -306,26 +467,25 @@ class ManagersView(TokenRequiredMixin, View):
         try:
             if action == "add":
                 api_client.add_manager(username, token)
-                messages.success(request, f"{username} added as manager.")
+                messages.success(request, f"{username} is now a manager.")
             elif action == "remove":
                 api_client.remove_manager(username, token)
-                messages.success(request, f"{username} removed from managers.")
+                messages.success(request, f"{username} is no longer a manager.")
         except APIError as e:
-            # A 403 here means the current user isn't an admin.
-            messages.error(request, f"Not authorized: {e.detail}")
+            messages.error(request, f"Could not update managers: {describe(e)}")
         return redirect("frontend:managers")
 
 
-# ---------- Delivery crew ----------
-# delivery_crew.html: expects `crew` (list). Same add/remove pattern.
+# ---------- Delivery crew (managers and admins) ----------
 
-class DeliveryCrewView(TokenRequiredMixin, View):
+class DeliveryCrewView(RoleRequiredMixin, View):
+    roles_any = ("is_manager",)
+
     def get(self, request):
-        token = get_token(request)
         try:
-            crew = api_client.list_delivery_crew(token)
+            crew = api_client.list_delivery_crew(get_token(request))
         except APIError as e:
-            messages.error(request, f"Not authorized: {e.detail}")
+            messages.error(request, f"Could not load the delivery crew: {describe(e)}")
             crew = []
         return render(request, "frontend/delivery_crew.html", {"crew": crew})
 
@@ -336,10 +496,10 @@ class DeliveryCrewView(TokenRequiredMixin, View):
         try:
             if action == "add":
                 api_client.add_delivery_crew(username, token)
-                messages.success(request, f"{username} added to delivery crew.")
+                messages.success(request, f"{username} joined the delivery crew.")
             elif action == "remove":
                 api_client.remove_delivery_crew(username, token)
-                messages.success(request, f"{username} removed from delivery crew.")
+                messages.success(request, f"{username} left the delivery crew.")
         except APIError as e:
-            messages.error(request, f"Not authorized: {e.detail}")
+            messages.error(request, f"Could not update the delivery crew: {describe(e)}")
         return redirect("frontend:delivery-crew")

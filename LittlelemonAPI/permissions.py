@@ -14,13 +14,20 @@ class IsManager(permissions.BasePermission):
         return _is_manager_or_super(request.user)
 
 
-class IsManagerOrReadOnly(permissions.BasePermission):
-    """Anyone can read (GET/HEAD/OPTIONS); only Manager/superuser can write."""
-    def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return _is_manager_or_super(request.user)
+def user_is_manager(user):
+    return bool(
+        user and user.is_authenticated and (
+            user.is_superuser or user.is_staff
+            or user.groups.filter(name='Manager').exists()
+        )
+    )
 
+
+class IsManagerOrReadOnly(permissions.BasePermission):
+    """Anyone can read; only managers and admins can write."""
+
+    def has_permission(self, request, view):
+        return request.method in permissions.SAFE_METHODS or user_is_manager(request.user)
 
 class CanUpdateOrder(permissions.BasePermission):
     """

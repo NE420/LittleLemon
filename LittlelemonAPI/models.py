@@ -3,6 +3,11 @@ from django.contrib.auth.models import User, Group
 from django.utils import timezone
 # Create your models here.
 
+
+def today():
+    return timezone.now().date()
+
+
 class Category(models.Model):
     title = models.CharField(max_length=255, db_index=True, unique=True)
     slug = models.SlugField()
@@ -35,7 +40,7 @@ class Order(models.Model):
     delivery_crew = models.ForeignKey(User, on_delete= models.SET_NULL, related_name="delivery_crew", null=True)
     status = models.BooleanField(db_index=True, default=0)
     total = models.DecimalField(max_digits=6, decimal_places= 2)
-    date = models.DateField(db_index=True)
+    date = models.DateField(db_index=True, default=today)
     
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
@@ -46,5 +51,3 @@ class OrderItem(models.Model):
     class Meta:
         unique_together = ('order', 'menuitem')
         
-def today():
-    return timezone.now().date()

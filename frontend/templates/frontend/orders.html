@@ -1,19 +1,16 @@
 {% extends 'frontend/base.html' %}
 
+{% block title %}Orders · LittleLemon{% endblock %}
+
 {% block content %}
 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
-  <div>
-    <p class="text-uppercase small text-primary fw-semibold mb-1">Orders</p>
-    <h2 class="h3 fw-bold mb-0">Recent orders</h2>
-  </div>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:index' %}">Back to dashboard</a>
+  <h2 class="h3 fw-bold mb-0">
+    {% if is_manager %}All orders{% elif is_delivery_crew %}Orders assigned to you{% else %}Your orders{% endif %}
+  </h2>
+  {% if is_customer %}
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:menu-items' %}">Order something</a>
+  {% endif %}
 </div>
-
-{% if is_manager %}
-<div class="alert alert-warning rounded-4 shadow-sm mb-4">Manager view: review the full order stream and update delivery status from this page.</div>
-{% else %}
-<div class="alert alert-info rounded-4 shadow-sm mb-4">Customer view: track the orders you can view as part of your account.</div>
-{% endif %}
 
 <div class="row g-4">
   {% for order in orders %}
@@ -21,34 +18,42 @@
     <article class="card shadow-sm border-0 rounded-4 h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="badge text-bg-light text-dark">Order #{{ order.id }}</span>
+          <h3 class="h5 fw-semibold mb-0">Order #{{ order.id }}</h3>
           <span class="badge {% if order.status %}text-bg-success{% else %}text-bg-warning{% endif %}">{% if order.status %}Completed{% else %}Pending{% endif %}</span>
         </div>
-        <!--
-          OrderSerializer doesn't nest user/delivery_crew, so these are
-          raw user IDs, not objects with .username. Showing IDs as a
-          placeholder — nesting them (or a separate UserSerilializer
-          pass) is a serializer-level fix, not a template one.
-        -->
-        <h3 class="h5 fw-semibold mb-1">Customer #{{ order.user }}</h3>
         <p class="text-muted small mb-3">{{ order.date }}</p>
+
+        {# The API returns user and delivery_crew as bare ids. #}
         <ul class="list-unstyled small text-muted mb-0">
           <li><strong>Total:</strong> ${{ order.total }}</li>
-          <li><strong>Delivery crew:</strong> {{ order.delivery_crew|default:'Unassigned' }}</li>
-          <li><strong>Status:</strong> {% if order.status %}Completed{% else %}Pending{% endif %}</li>
+          {% if is_manager %}
+          <li><strong>Customer:</strong> #{{ order.user }}</li>
+          <li><strong>Delivery crew:</strong> {% if order.delivery_crew %}#{{ order.delivery_crew }}{% else %}Unassigned{% endif %}</li>
+          {% else %}
+          <li><strong>Delivery:</strong> {% if order.delivery_crew %}Assigned{% else %}Not assigned yet{% endif %}</li>
+          {% endif %}
         </ul>
-        {% if is_manager %}
-        <form method="post" action="{% url 'frontend:single-order' order.id %}" class="d-grid gap-2 mt-3">
-          {% csrf_token %}
-          <input type="hidden" name="status" value="{% if order.status %}0{% else %}1{% endif %}" />
-          <button class="btn btn-outline-warning btn-sm" type="submit">{% if order.status %}Mark pending{% else %}Mark completed{% endif %}</button>
-        </form>
+
+        {% if is_manager or is_delivery_crew %}
+        {% include "frontend/partials/_order_update_form.html" %}
         {% endif %}
       </div>
     </article>
   </div>
   {% empty %}
-  <div class="col-12"><div class="alert alert-info mb-0">No orders are available yet.</div></div>
+  <div class="col-12">
+    <div class="alert alert-info mb-0">
+      {% if is_customer %}
+      You haven't placed any orders yet. <a href="{% url 'frontend:menu-items' %}" class="alert-link">Browse the menu</a> to place one.
+      {% elif is_delivery_crew %}
+      Nothing is assigned to you right now.
+      {% else %}
+      There are no orders yet.
+      {% endif %}
+    </div>
+  </div>
   {% endfor %}
 </div>
+
+{% include "frontend/partials/_pagination.html" %}
 {% endblock %}
