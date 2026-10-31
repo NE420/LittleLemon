@@ -188,13 +188,18 @@ class LoginView(View):
         # They change when someone is added to / removed from a group, and
         # show up after the next login.
         try:
-            roles = derive_roles(api_client.get_current_user(token))
+            me = api_client.get_current_user(token)
+            # Djoser's default serializer answers without `groups`; treat
+            # that as a failure rather than silently making everyone a customer.
+            if "groups" not in me:
+                raise APIError(200, "current_user serializer returns no groups")
+            roles = derive_roles(me)
         except APIError:
             roles = {}
             messages.warning(
                 request,
                 "Logged in, but your role couldn't be loaded, so manager "
-                "features are hidden. Check the Djoser current_user serializer.",
+                "features are hidden. Check DJOSER['SERIALIZERS']['current_user'].",
             )
 
         request.session["auth_token"] = token
@@ -246,6 +251,8 @@ class CategoriesView(RoleRequiredMixin, View):
 # ---------- Menu items ----------
 # MenuItemsView: list + create (menu-items/)
 # SingleMenuItemView: update / delete one item (menu-items/<pk>/)
+# The API identifies a menu item's category by its title (SlugRelatedField),
+# both in what it returns and in what it accepts.
 
 class MenuItemsView(RoleRequiredMixin, View):
     roles_any = ("is_manager",)
@@ -267,10 +274,9 @@ class MenuItemsView(RoleRequiredMixin, View):
         except APIError:
             categories = []
 
-        # The API returns each item's category as a bare id.
-        titles = {c["id"]: c["title"] for c in categories}
+        # The API already returns the category's title.
         for item in items:
-            item["category_title"] = titles.get(item["category"], "Uncategorised")
+            item["category_title"] = item.get("category") or "Uncategorised"
 
         return render(request, "frontend/menu_items.html", {
             "items": items,
@@ -283,7 +289,7 @@ class MenuItemsView(RoleRequiredMixin, View):
             data = {
                 "title": request.POST.get("title"),
                 "price": request.POST.get("price"),
-                "category": request.POST.get("category"),
+                "category": request.POST.get("category"),  # a category title
                 "featured": request.POST.get("featured") == "on",
             }
             try:
@@ -306,7 +312,7 @@ class SingleMenuItemView(RoleRequiredMixin, View):
             data = {
                 "title": request.POST.get("title"),
                 "price": request.POST.get("price"),
-                "category": request.POST.get("category"),
+                "category": request.POST.get("category"),  # a category title
                 "featured": request.POST.get("featured") == "on",
             }
             try:
@@ -365,16 +371,15 @@ class CartView(TokenRequiredMixin, View):
                 quantity = 1
             try:
                 menu_item = api_client.get_menu_item(item_id)
-                data = {
-                    "menuitem": item_id,
-                    "quantity": quantity,
-                    "unit_price": menu_item["price"],
-                    "price": float(menu_item["price"]) * quantity,
-                }
-                api_client.add_to_cart(data, token)
+                # The API works out unit_price and price itself.
+                api_client.add_to_cart({"menuitem": item_id, "quantity": quantity}, token)
                 messages.success(request, f"Added {menu_item['title']} to your cart.")
             except APIError as e:
-                messages.error(request, f"Could not add to cart: {describe(e)}")
+                # A user can hold each menu item only once (unique_together).
+                if "unique" in describe(e).lower():
+                    messages.info(request, "That item is already in your cart.")
+                else:
+                    messages.error(request, f"Could not add to cart: {describe(e)}")
 
         elif action == "clear":
             try:

@@ -1,4 +1,4 @@
-{# Manager-only. Expects `item` and `categories`. Item.category is a bare id from the API. #}
+{# Manager-only. Expects `item` and `categories`. The API gives item.category as the category's title. #}
 <div class="dropdown">
   <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="menuItemDropdown{{ item.id }}" data-bs-toggle="dropdown" aria-expanded="false">
     Edit item
@@ -20,7 +20,7 @@
         <label class="form-label small text-muted" for="edit-category-{{ item.id }}">Category</label>
         <select id="edit-category-{{ item.id }}" name="category" class="form-select form-select-sm" required>
           {% for category in categories %}
-          <option value="{{ category.id }}"{% if category.id == item.category %} selected{% endif %}>{{ category.title }}</option>
+          <option value="{{ category.title }}"{% if category.title == item.category %} selected{% endif %}>{{ category.title }}</option>
           {% endfor %}
         </select>
       </div>

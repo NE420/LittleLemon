@@ -1,7 +1,4 @@
-from urllib import request
-
 from django.db import transaction
-from django.db.migrations import serializer
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -18,7 +15,7 @@ class CategoriesView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [IsManagerOrReadOnly]
-   
+
 
 class SingleCategoryView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
@@ -30,9 +27,9 @@ class MenuItemsView(generics.ListCreateAPIView):
     queryset = menuItem.objects.all()
     serializer_class = MenuItemSerializer
     permission_classes = [IsManagerOrReadOnly]
-    search_fields = ['category__title']
-    ordering_fields = ['price', 'inventory']
-    
+    search_fields = ['title', 'category__title']
+    ordering_fields = ['price', 'title']
+
 
 class SingleMenuItemView(generics.RetrieveUpdateDestroyAPIView):
     queryset = menuItem.objects.all()
@@ -60,11 +57,6 @@ class OrderView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if not user or not user.is_authenticated:
-            if 'text/html' in self.request.headers.get('Accept', ''):
-                return Order.objects.all().order_by('-date', '-id')
-            return Order.objects.none()
-
         if user.is_superuser:
             return Order.objects.all()
         if user.groups.count() == 0:
@@ -79,17 +71,18 @@ class OrderView(generics.ListCreateAPIView):
             return Response({"message": "no item in cart"}, status=status.HTTP_400_BAD_REQUEST)
 
         data = request.data.copy()
-        data['total'] = self.get_total_price(request.user)
         data['user'] = request.user.id
         serializer = OrderSerializer(data=data)
-        serializer.is_valid(raise_exception=True)      # was: silently returned None
-        
+        serializer.is_valid(raise_exception=True)
+
         with transaction.atomic():                     # no half-built orders
-            order = serializer.save()
+            # `total` is read-only on the serializer, so it can't come in
+            # through `data`; it has to be passed to save() directly.
+            order = serializer.save(user=request.user, total=self.get_total_price(request.user))
             for item in cart_items:
                 OrderItem.objects.create(
                     order=order, menuitem=item.menuitem, quantity=item.quantity,
-                    unit_price=item.unit_price, price=item.price,   # unit_price was missing
+                    unit_price=item.unit_price, price=item.price,
                 )
             cart_items.delete()
 
@@ -97,8 +90,7 @@ class OrderView(generics.ListCreateAPIView):
 
     def get_total_price(self, user):
         total = 0
-        items = Cart.objects.all().filter(user=user).all()
-        for item in items.values():
+        for item in Cart.objects.filter(user=user).values('price'):
             total += item['price']
         return total
 
@@ -107,7 +99,7 @@ class SingleOrderView(generics.RetrieveUpdateAPIView):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated, CanUpdateOrder]
-    
+
     def get_serializer_class(self):
         if self.request.method in ('PUT', 'PATCH'):
             return OrderUpdateSerializer
@@ -137,8 +129,8 @@ class GroupMembershipViewSet(viewsets.ViewSet):
 class GroupViewSet(GroupMembershipViewSet):
     group_name = "Manager"
     permission_classes = [IsManager]
-    
-    
+
+
 class DeliveryCrewViewSet(GroupMembershipViewSet):
     group_name = "Delivery crew"
     permission_classes = [DeliveryCrewPermission]
