@@ -1,59 +1,62 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Orders · LittleLemon{% endblock %}
+{% block title %}Orders - Little Lemon{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
-  <h2 class="h3 fw-bold mb-0">
-    {% if is_manager %}All orders{% elif is_delivery_crew %}Orders assigned to you{% else %}Your orders{% endif %}
-  </h2>
+<div class="page-head">
+  <div>
+    <h1>{% if is_manager %}All orders{% elif is_delivery_crew %}Orders assigned to you{% else %}Your orders{% endif %}</h1>
+  </div>
   {% if is_customer %}
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:menu-items' %}">Order something</a>
+  <a class="btn btn-ghost btn-sm" href="{% url 'frontend:menu-items' %}">Order something</a>
   {% endif %}
 </div>
 
-<div class="row g-4">
+{% if orders %}
+<div class="grid">
   {% for order in orders %}
-  <div class="col-12 col-md-6 col-xl-4">
-    <article class="card shadow-sm border-0 rounded-4 h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h3 class="h5 fw-semibold mb-0">Order #{{ order.id }}</h3>
-          <span class="badge {% if order.status %}text-bg-success{% else %}text-bg-warning{% endif %}">{% if order.status %}Completed{% else %}Pending{% endif %}</span>
-        </div>
-        <p class="text-muted small mb-3">{{ order.date }}</p>
-
-        {# The API returns user and delivery_crew as bare ids. #}
-        <ul class="list-unstyled small text-muted mb-0">
-          <li><strong>Total:</strong> ${{ order.total }}</li>
-          {% if is_manager %}
-          <li><strong>Customer:</strong> #{{ order.user }}</li>
-          <li><strong>Delivery crew:</strong> {% if order.delivery_crew %}#{{ order.delivery_crew }}{% else %}Unassigned{% endif %}</li>
-          {% else %}
-          <li><strong>Delivery:</strong> {% if order.delivery_crew %}Assigned{% else %}Not assigned yet{% endif %}</li>
-          {% endif %}
-        </ul>
-
-        {% if is_manager or is_delivery_crew %}
-        {% include "frontend/partials/_order_update_form.html" %}
-        {% endif %}
+  <article class="panel order">
+    <div class="order-head">
+      <div>
+        <h2>Order #{{ order.id }}</h2>
+        <p class="date">{{ order.date }}</p>
       </div>
-    </article>
-  </div>
-  {% empty %}
-  <div class="col-12">
-    <div class="alert alert-info mb-0">
-      {% if is_customer %}
-      You haven't placed any orders yet. <a href="{% url 'frontend:menu-items' %}" class="alert-link">Browse the menu</a> to place one.
-      {% elif is_delivery_crew %}
-      Nothing is assigned to you right now.
-      {% else %}
-      There are no orders yet.
-      {% endif %}
+      <span class="pill {% if order.status %}pill-done{% else %}pill-pending{% endif %}">{% if order.status %}Completed{% else %}Pending{% endif %}</span>
     </div>
-  </div>
+
+    {# The API returns user and delivery_crew as bare ids. #}
+    <dl class="facts">
+      <div><dt>Items</dt><dd>{{ order.orderitem|length }}</dd></div>
+      <div><dt>Total</dt><dd>${{ order.total }}</dd></div>
+      {% if is_manager %}
+      <div><dt>Customer</dt><dd>#{{ order.user }}</dd></div>
+      <div><dt>Delivery crew</dt><dd>{% if order.delivery_crew %}#{{ order.delivery_crew }}{% else %}Unassigned{% endif %}</dd></div>
+      {% else %}
+      <div><dt>Delivery</dt><dd>{% if order.delivery_crew %}Assigned{% else %}Not assigned yet{% endif %}</dd></div>
+      {% endif %}
+    </dl>
+
+    {% if is_manager or is_delivery_crew %}
+    {% include "frontend/partials/_order_update_form.html" %}
+    {% endif %}
+  </article>
   {% endfor %}
 </div>
+{% else %}
+<div class="empty">
+  {% if is_customer %}
+  <h2>No orders yet</h2>
+  <p>When you place an order, you can follow it here.</p>
+  <a class="btn btn-primary" href="{% url 'frontend:menu-items' %}">See the menu</a>
+  {% elif is_delivery_crew %}
+  <h2>Nothing assigned to you</h2>
+  <p>New deliveries will show up here as managers assign them.</p>
+  {% else %}
+  <h2>No orders yet</h2>
+  <p>Orders will appear here as soon as customers place them.</p>
+  {% endif %}
+</div>
+{% endif %}
 
 {% include "frontend/partials/_pagination.html" %}
 {% endblock %}

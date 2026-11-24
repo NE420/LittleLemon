@@ -1,67 +1,70 @@
-<!doctype html>
+{% load static %}<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}LittleLemon{% endblock %}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <title>{% block title %}Little Lemon{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'frontend/css/littlelemon.css' %}" />
 </head>
-<body class="bg-light">
-  {% with current=request.resolver_match.url_name %}
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm sticky-top">
-    <div class="container-fluid">
-      <a class="navbar-brand fw-semibold" href="{% url 'frontend:index' %}">LittleLemon</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu" aria-controls="navMenu" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navMenu">
-        {# Links are only shown to roles that can use the page. The views enforce access too. #}
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link{% if current == 'index' %} active{% endif %}" href="{% url 'frontend:index' %}">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link{% if current == 'categories' %} active{% endif %}" href="{% url 'frontend:categories' %}">Categories</a></li>
-          <li class="nav-item"><a class="nav-link{% if current == 'menu-items' %} active{% endif %}" href="{% url 'frontend:menu-items' %}">Menu</a></li>
-          {% if is_customer %}
-          <li class="nav-item"><a class="nav-link{% if current == 'cart' %} active{% endif %}" href="{% url 'frontend:cart' %}">Cart</a></li>
-          {% endif %}
-          {% if logged_in %}
-          <li class="nav-item"><a class="nav-link{% if current == 'orders' %} active{% endif %}" href="{% url 'frontend:orders' %}">Orders</a></li>
-          {% endif %}
-          {% if is_manager %}
-          <li class="nav-item"><a class="nav-link{% if current == 'delivery-crew' %} active{% endif %}" href="{% url 'frontend:delivery-crew' %}">Delivery crew</a></li>
-          {% endif %}
-          {% if is_admin %}
-          <li class="nav-item"><a class="nav-link{% if current == 'managers' %} active{% endif %}" href="{% url 'frontend:managers' %}">Managers</a></li>
-          {% endif %}
-        </ul>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
 
-        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-          {% if logged_in %}
-          <li class="nav-item">
-            <span class="navbar-text">
-              {{ current_username }}
-              <span class="badge text-bg-secondary ms-1">{% if is_admin %}Admin{% elif is_manager %}Manager{% elif is_delivery_crew %}Delivery crew{% else %}Customer{% endif %}</span>
-            </span>
-          </li>
-          <li class="nav-item">
-            <form method="post" action="{% url 'frontend:logout' %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
-            </form>
-          </li>
-          {% else %}
-          <li class="nav-item"><a class="nav-link{% if current == 'login' %} active{% endif %}" href="{% url 'frontend:login' %}">Log in</a></li>
-          {% endif %}
-        </ul>
+  {% with current=request.resolver_match.url_name %}
+  <header class="site-header" id="site-header">
+    <div class="wrap">
+      <a class="brand" href="{% url 'frontend:index' %}">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="32" r="30" fill="#f2cb2f" />
+          <circle cx="32" cy="32" r="24" fill="#fbf1c4" />
+          <path d="M32 10v44M10 32h44M16.5 16.5l31 31M47.5 16.5l-31 31" stroke="#f2cb2f" stroke-width="3" stroke-linecap="round" />
+          <circle cx="32" cy="32" r="4" fill="#f2cb2f" />
+        </svg>
+        Little Lemon
+      </a>
+
+      <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">
+        <span class="visually-hidden">Menu</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+      </button>
+
+      {# Links are only shown to roles that can use the page. The views enforce access too. #}
+      <nav class="nav" id="site-nav" aria-label="Main">
+        <a href="{% url 'frontend:index' %}"{% if current == 'index' %} aria-current="page"{% endif %}>Dashboard</a>
+        <a href="{% url 'frontend:menu-items' %}"{% if current == 'menu-items' %} aria-current="page"{% endif %}>Menu</a>
+        <a href="{% url 'frontend:categories' %}"{% if current == 'categories' %} aria-current="page"{% endif %}>Categories</a>
+        {% if is_customer %}<a href="{% url 'frontend:cart' %}"{% if current == 'cart' %} aria-current="page"{% endif %}>Cart</a>{% endif %}
+        {% if logged_in %}<a href="{% url 'frontend:orders' %}"{% if current == 'orders' %} aria-current="page"{% endif %}>Orders</a>{% endif %}
+        {% if is_manager %}<a href="{% url 'frontend:delivery-crew' %}"{% if current == 'delivery-crew' %} aria-current="page"{% endif %}>Delivery crew</a>{% endif %}
+        {% if is_admin %}<a href="{% url 'frontend:managers' %}"{% if current == 'managers' %} aria-current="page"{% endif %}>Managers</a>{% endif %}
+      </nav>
+
+      <div class="header-actions">
+        {% if logged_in %}
+        <span class="user-chip">
+          <span class="avatar" aria-hidden="true">{{ current_username|first|upper }}</span>
+          {{ current_username }}
+          <span class="role">{% if is_admin %}Admin{% elif is_manager %}Manager{% elif is_delivery_crew %}Delivery crew{% else %}Customer{% endif %}</span>
+        </span>
+        <form class="inline-form" method="post" action="{% url 'frontend:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost btn-sm">Log out</button>
+        </form>
+        {% else %}
+        <a class="btn btn-dark btn-sm" href="{% url 'frontend:login' %}">Log in</a>
+        {% endif %}
       </div>
     </div>
-  </nav>
+  </header>
   {% endwith %}
 
-  <main class="container py-4">
+  <main class="wrap" id="main">
     {% if messages %}
-    <div class="mb-4">
+    <div class="flashes" role="status">
       {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} rounded-4 shadow-sm mb-2">{{ message }}</div>
+      <div class="flash flash-{{ message.tags|default:'info' }}">{{ message }}</div>
       {% endfor %}
     </div>
     {% endif %}
@@ -69,6 +72,23 @@
     {% block content %}{% endblock %}
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>Little Lemon</span>
+      <span>Coffee and tea, made to order.</span>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var header = document.getElementById('site-header');
+      var button = document.getElementById('nav-toggle');
+      if (!header || !button) return;
+      button.addEventListener('click', function () {
+        var open = header.classList.toggle('is-open');
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    })();
+  </script>
 </body>
 </html>

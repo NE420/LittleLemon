@@ -1,38 +1,35 @@
 {# Expects `members` (list of {username, email}), `label` (e.g. "manager") and `empty_text`. #}
-<div class="card shadow-sm border-0 rounded-4 mb-4">
-  <div class="card-body">
-    <h3 class="h5 fw-semibold mb-3">Add a {{ label }}</h3>
-    <form method="post" class="row g-3 align-items-end">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="add" />
-      <div class="col-12 col-md-8">
-        <label class="form-label small text-muted" for="group-username">Username</label>
-        <input id="group-username" name="username" class="form-control" required />
-      </div>
-      <div class="col-12 col-md-4">
-        <button type="submit" class="btn btn-success w-100">Add {{ label }}</button>
-      </div>
-    </form>
-  </div>
+<div class="panel" style="margin-bottom: 28px;">
+  <h2 style="margin-bottom: 16px;">Add a {{ label }}</h2>
+  <form method="post" class="form-grid">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add" />
+    <div class="field">
+      <label for="group-username">Username</label>
+      <input id="group-username" name="username" class="input" autocomplete="off" required />
+    </div>
+    <div><button type="submit" class="btn btn-primary">Add {{ label }}</button></div>
+  </form>
 </div>
 
-<div class="row g-4">
+{% if members %}
+<div class="members">
   {% for member in members %}
-  <div class="col-12 col-md-6 col-xl-4">
-    <article class="card shadow-sm border-0 rounded-4 h-100">
-      <div class="card-body">
-        <h3 class="h5 fw-semibold mb-1">{{ member.username }}</h3>
-        <p class="text-muted small mb-3">{{ member.email|default:"No email on file" }}</p>
-        <form method="post">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="remove" />
-          <input type="hidden" name="username" value="{{ member.username }}" />
-          <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Remove {{ member.username|escapejs }} as {{ label|escapejs }}?');">Remove {{ label }}</button>
-        </form>
-      </div>
-    </article>
-  </div>
-  {% empty %}
-  <div class="col-12"><div class="alert alert-info mb-0">{{ empty_text }}</div></div>
+  <article class="panel member">
+    <span class="avatar" aria-hidden="true">{{ member.username|first|upper }}</span>
+    <div class="who">
+      <p class="name">{{ member.username }}</p>
+      <p class="mail">{{ member.email|default:"No email on file" }}</p>
+    </div>
+    <form class="inline-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="remove" />
+      <input type="hidden" name="username" value="{{ member.username }}" />
+      <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Remove {{ member.username|escapejs }} as {{ label|escapejs }}?');">Remove</button>
+    </form>
+  </article>
   {% endfor %}
 </div>
+{% else %}
+<div class="empty"><p>{{ empty_text }}</p></div>
+{% endif %}

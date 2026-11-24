@@ -1,37 +1,36 @@
 {# Manager-only. Expects `categories`. Include inside {% if is_manager %}. #}
 {# The API identifies a category by its title, so the option values are titles. #}
-<div class="card shadow-sm border-0 rounded-4 mb-4">
-  <div class="card-body">
-    <h3 class="h5 fw-semibold mb-3">Add a menu item</h3>
-    <form method="post" class="row g-3 align-items-end">
+<details class="disclosure">
+  <summary>Add a menu item</summary>
+  <div class="disclosure-body">
+    <form method="post" class="form-stack">
       {% csrf_token %}
       <input type="hidden" name="action" value="create" />
-      <div class="col-12 col-md-4">
-        <label class="form-label small text-muted" for="new-item-title">Title</label>
-        <input id="new-item-title" name="title" class="form-control" required />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label small text-muted" for="new-item-price">Price</label>
-        <input id="new-item-price" name="price" type="number" step="0.01" min="0" class="form-control" required />
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label small text-muted" for="new-item-category">Category</label>
-        <select id="new-item-category" name="category" class="form-select" required>
-          <option value="" disabled selected>Select a category</option>
-          {% for category in categories %}
-          <option value="{{ category.title }}">{{ category.title }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-2">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="featured" id="new-item-featured" />
-          <label class="form-check-label" for="new-item-featured">Featured</label>
+      <div class="form-grid">
+        <div class="field">
+          <label for="new-item-title">Title</label>
+          <input id="new-item-title" name="title" class="input" required />
         </div>
+        <div class="field">
+          <label for="new-item-price">Price</label>
+          <input id="new-item-price" name="price" type="number" step="0.01" min="0" class="input" required />
+        </div>
+        <div class="field">
+          <label for="new-item-category">Category</label>
+          <select id="new-item-category" name="category" class="select" required>
+            <option value="" disabled selected>Select a category</option>
+            {% for category in categories %}
+            <option value="{{ category.title }}">{{ category.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <label class="check" for="new-item-featured">
+          <input type="checkbox" name="featured" id="new-item-featured" />
+          Featured
+        </label>
       </div>
-      <div class="col-12">
-        <button type="submit" class="btn btn-success">Add menu item</button>
-      </div>
+      <p class="hint">Photos come from the media folder. Save the picture named after the drink, for example Iced_tea.jpg for "Iced tea".</p>
+      <div><button type="submit" class="btn btn-primary">Add menu item</button></div>
     </form>
   </div>
-</div>
+</details>

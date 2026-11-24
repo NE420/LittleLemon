@@ -1,73 +1,56 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Menu · LittleLemon{% endblock %}
+{% block title %}Menu - Little Lemon{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
-  <h2 class="h3 fw-bold mb-0">Menu</h2>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:categories' %}">Browse categories</a>
+<div class="page-head">
+  <div>
+    <h1>Menu</h1>
+    <p>Everything we pour, with the price up front.</p>
+  </div>
+  <a class="btn btn-ghost btn-sm" href="{% url 'frontend:categories' %}">Browse categories</a>
 </div>
 
 {% if is_manager %}
 {% include "frontend/partials/_menu_item_create_form.html" %}
 {% endif %}
 
-<div class="card shadow-sm border-0 rounded-4 mb-4">
-  <div class="card-body">
-    {# The API only searches by category title and sorts by price. #}
-    <form method="get" class="row g-3 align-items-end">
-      <div class="col-12 col-md-6">
-        <label for="search" class="form-label small text-muted">Search by category</label>
-        <input id="search" name="search" type="search" class="form-control" value="{{ request.GET.search }}" placeholder="e.g. desserts" />
-      </div>
-      <div class="col-12 col-md-4">
-        <label for="ordering" class="form-label small text-muted">Sort by</label>
-        <select id="ordering" name="ordering" class="form-select">
-          <option value="">Default order</option>
-          <option value="price"{% if request.GET.ordering == "price" %} selected{% endif %}>Price, low to high</option>
-          <option value="-price"{% if request.GET.ordering == "-price" %} selected{% endif %}>Price, high to low</option>
-        </select>
-      </div>
-      <div class="col-12 col-md-2 d-flex gap-2">
-        <button class="btn btn-primary flex-grow-1" type="submit">Apply</button>
-        <a class="btn btn-outline-secondary" href="{% url 'frontend:menu-items' %}">Reset</a>
-      </div>
-    </form>
+{# The API searches item titles and category titles, and sorts by price or title. #}
+<form method="get" class="toolbar">
+  <div class="field">
+    <label for="search">Search the menu</label>
+    <input id="search" name="search" type="search" class="input" value="{{ request.GET.search }}" placeholder="Coffee, tea, desserts" />
   </div>
-</div>
+  <div class="field narrow">
+    <label for="ordering">Sort by</label>
+    <select id="ordering" name="ordering" class="select">
+      <option value="">Default order</option>
+      <option value="price"{% if request.GET.ordering == "price" %} selected{% endif %}>Price, low to high</option>
+      <option value="-price"{% if request.GET.ordering == "-price" %} selected{% endif %}>Price, high to low</option>
+      <option value="title"{% if request.GET.ordering == "title" %} selected{% endif %}>Name, A to Z</option>
+    </select>
+  </div>
+  <div class="row-actions">
+    <button class="btn btn-dark" type="submit">Apply</button>
+    {% if request.GET.search or request.GET.ordering %}
+    <a class="btn btn-ghost" href="{% url 'frontend:menu-items' %}">Reset</a>
+    {% endif %}
+  </div>
+</form>
 
-<div class="row g-4">
+{% if items %}
+<div class="grid">
   {% for item in items %}
-  <div class="col-12 col-md-6 col-xl-4">
-    <article class="card shadow-sm border-0 rounded-4 h-100">
-      <div class="card-body d-flex flex-column">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="badge text-bg-light text-dark">{{ item.category_title }}</span>
-          {% if item.featured %}<span class="badge text-bg-warning">Featured</span>{% endif %}
-        </div>
-        <h3 class="h5 fw-semibold mb-2">{{ item.title }}</h3>
-        <p class="fs-5 fw-semibold mb-3">${{ item.price }}</p>
-
-        <div class="mt-auto">
-          {% if is_manager %}
-            {% include "frontend/partials/_menu_item_manager_controls.html" %}
-          {% elif is_customer %}
-            {% include "frontend/partials/_menu_item_add_to_cart.html" %}
-          {% elif not logged_in %}
-            <a class="btn btn-outline-primary btn-sm" href="{% url 'frontend:login' %}">Log in to order</a>
-          {% endif %}
-        </div>
-      </div>
-    </article>
-  </div>
-  {% empty %}
-  <div class="col-12">
-    <div class="alert alert-warning mb-0">
-      Nothing on the menu matches that search. <a href="{% url 'frontend:menu-items' %}" class="alert-link">Clear the filters</a> to see everything.
-    </div>
-  </div>
+  {% include "frontend/partials/_menu_card.html" with item=item actions=True %}
   {% endfor %}
 </div>
+{% else %}
+<div class="empty">
+  <h2>Nothing matches that search</h2>
+  <p>Try a shorter word, or clear the filters to see the whole menu.</p>
+  <a class="btn btn-ghost" href="{% url 'frontend:menu-items' %}">Clear the filters</a>
+</div>
+{% endif %}
 
 {% include "frontend/partials/_pagination.html" %}
 {% endblock %}

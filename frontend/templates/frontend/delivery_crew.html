@@ -1,12 +1,15 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Delivery crew · LittleLemon{% endblock %}
+{% block title %}Delivery crew - Little Lemon{% endblock %}
 
 {% block content %}
 {# Manager-only page: DeliveryCrewView refuses everyone else, so nothing here checks roles. #}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
-  <h2 class="h3 fw-bold mb-0">Delivery crew</h2>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:orders' %}">Go to orders</a>
+<div class="page-head">
+  <div>
+    <h1>Delivery crew</h1>
+    <p>People on the crew see the orders assigned to them and can mark them completed.</p>
+  </div>
+  <a class="btn btn-ghost btn-sm" href="{% url 'frontend:orders' %}">Go to orders</a>
 </div>
 
 {% include "frontend/partials/_group_members.html" with members=crew label="delivery crew member" empty_text="No one is on the delivery crew yet. Add a member above." %}

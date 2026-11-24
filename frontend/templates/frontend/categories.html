@@ -1,33 +1,36 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Categories · LittleLemon{% endblock %}
+{% block title %}Categories - Little Lemon{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
-  <h2 class="h3 fw-bold mb-0">Categories</h2>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:menu-items' %}">Browse the menu</a>
+<div class="page-head">
+  <div>
+    <h1>Categories</h1>
+    <p>Pick a category to see what's in it.</p>
+  </div>
+  <a class="btn btn-ghost btn-sm" href="{% url 'frontend:menu-items' %}">See the whole menu</a>
 </div>
 
 {% if is_manager %}
 {% include "frontend/partials/_category_create_form.html" %}
 {% endif %}
 
-<div class="row g-4">
+{% if categories %}
+<div class="grid">
   {% for category in categories %}
-  <div class="col-12 col-md-6 col-xl-4">
-    <article class="card shadow-sm border-0 rounded-4 h-100">
-      <div class="card-body">
-        <span class="badge text-bg-light text-dark">{{ category.slug }}</span>
-        <h3 class="h5 fw-semibold mt-3 mb-0">{{ category.title }}</h3>
-      </div>
-    </article>
-  </div>
-  {% empty %}
-  <div class="col-12">
-    <div class="alert alert-info mb-0">
-      No categories yet.{% if is_manager %} Add the first one above.{% endif %}
+  <a class="panel cat" href="{% url 'frontend:menu-items' %}?search={{ category.title|urlencode }}">
+    <div>
+      <h2>{{ category.title }}</h2>
+      <p class="slug">{{ category.slug }}</p>
     </div>
-  </div>
+    <span class="go">See the items</span>
+  </a>
   {% endfor %}
 </div>
+{% else %}
+<div class="empty">
+  <h2>No categories yet</h2>
+  <p>{% if is_manager %}Add the first one above.{% else %}Check back soon.{% endif %}</p>
+</div>
+{% endif %}
 {% endblock %}

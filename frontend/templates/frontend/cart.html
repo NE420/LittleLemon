@@ -1,61 +1,52 @@
 {% extends 'frontend/base.html' %}
 
-{% block title %}Cart · LittleLemon{% endblock %}
+{% block title %}Cart - Little Lemon{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-2">
-  <h2 class="h3 fw-bold mb-0">Your cart</h2>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'frontend:menu-items' %}">Keep browsing</a>
-</div>
-
-<div class="card shadow-sm border-0 rounded-4">
-  <div class="card-body">
-    {% if items %}
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Item</th>
-            <th>Quantity</th>
-            <th>Unit price</th>
-            <th class="text-end">Line total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for line in items %}
-          <tr>
-            <td>{{ line.menuitem_title }}</td>
-            <td>{{ line.quantity }}</td>
-            <td>${{ line.unit_price }}</td>
-            <td class="text-end">${{ line.price }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div class="d-flex justify-content-between align-items-center mt-3 border-top pt-3">
-      <span class="fw-semibold">Total</span>
-      <span class="h5 mb-0">${{ total }}</span>
-    </div>
-
-    <div class="d-flex gap-2 mt-3">
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="checkout" />
-        <button type="submit" class="btn btn-success">Place order</button>
-      </form>
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="clear" />
-        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Remove everything from your cart?');">Clear cart</button>
-      </form>
-    </div>
-    {% else %}
-    <div class="alert alert-info mb-0">
-      Your cart is empty. <a href="{% url 'frontend:menu-items' %}" class="alert-link">Pick something from the menu</a> to get started.
-    </div>
-    {% endif %}
+<div class="page-head">
+  <div>
+    <h1>Your cart</h1>
   </div>
+  <a class="btn btn-ghost btn-sm" href="{% url 'frontend:menu-items' %}">Keep browsing</a>
 </div>
+
+{% if items %}
+<div class="cart-layout">
+  <section class="panel" aria-label="Items in your cart">
+    {% for line in items %}
+    <div class="cart-line">
+      <div class="thumb">{% include "frontend/partials/_drink_image.html" with title=line.menuitem_title %}</div>
+      <div>
+        <p class="line-title">{{ line.menuitem_title }}</p>
+        <p class="line-meta">{{ line.quantity }} x ${{ line.unit_price }}</p>
+      </div>
+      <p class="line-total">${{ line.price }}</p>
+    </div>
+    {% endfor %}
+  </section>
+
+  <aside class="panel summary" aria-label="Order summary">
+    <div class="row">
+      <span>Total</span>
+      <span class="total">${{ total }}</span>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="checkout" />
+      <button type="submit" class="btn btn-primary btn-block">Place order</button>
+    </form>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="clear" />
+      <button type="submit" class="btn btn-ghost btn-block" onclick="return confirm('Remove everything from your cart?');">Clear cart</button>
+    </form>
+  </aside>
+</div>
+{% else %}
+<div class="empty">
+  <h2>Your cart is empty</h2>
+  <p>Pick something from the menu and it will show up here.</p>
+  <a class="btn btn-primary" href="{% url 'frontend:menu-items' %}">See the menu</a>
+</div>
+{% endif %}
 {% endblock %}

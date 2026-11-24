@@ -1,0 +1,25 @@
+{# Expects `item` (an API menu item). Pass actions=True on the menu page to show the buttons for the viewer's role. #}
+<article class="drink">
+  <div class="drink-media">
+    {% include "frontend/partials/_drink_image.html" with title=item.title %}
+    {% if item.featured %}<span class="pill pill-featured">Featured</span>{% endif %}
+  </div>
+
+  <div class="drink-top">
+    <h3>{{ item.title }}</h3>
+    <p class="price">${{ item.price }}</p>
+  </div>
+  <p class="drink-cat">{{ item.category_title|default:item.category }}</p>
+
+  {% if actions %}
+  <div class="drink-actions">
+    {% if is_manager %}
+      {% include "frontend/partials/_menu_item_manager_controls.html" %}
+    {% elif is_customer %}
+      {% include "frontend/partials/_menu_item_add_to_cart.html" %}
+    {% elif not logged_in %}
+      <a class="btn btn-ghost btn-sm" href="{% url 'frontend:login' %}">Log in to order</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</article>
